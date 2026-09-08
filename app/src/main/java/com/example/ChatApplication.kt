@@ -39,9 +39,8 @@ class ChatApplication : Application() {
             // Supabase Storage runtime diagnostic check
             val supabaseStatus = com.example.service.SupabaseConfigManager.getConfigStatus(this)
             Log.i("ChatApplication", "=== Supabase Storage Runtime Diagnostics ===")
-            Log.i("ChatApplication", "Supabase URL Detected: ${if (supabaseStatus.hasUrl) "YES (${supabaseStatus.urlDisplay})" else "NO"}")
-            Log.i("ChatApplication", "Public Key Detected: ${if (supabaseStatus.hasKey) "YES (${supabaseStatus.keyTypeDisplay}, ${supabaseStatus.keyMasked})" else "NO"}")
-            Log.i("ChatApplication", "Storage Configured: ${supabaseStatus.isConfigured}")
+            Log.i("ChatApplication", "SUPABASE_URL detected = ${supabaseStatus.urlDetected}")
+            Log.i("ChatApplication", "SUPABASE_PUBLIC_KEY detected = ${supabaseStatus.publicKeyDetected}")
             Log.i("ChatApplication", "=============================================")
         } catch (e: Exception) {
             Log.e("ChatApplication", "FATAL: Application onCreate initialization failed: ${e.message}", e)

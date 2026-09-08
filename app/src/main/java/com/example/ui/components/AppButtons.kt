@@ -1,7 +1,9 @@
 package com.example.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -549,3 +551,86 @@ fun AppFilterChip(
         }
     }
 }
+
+/**
+ * Modern Ghost / Borderless text button with clean hover/press feedback.
+ */
+@Composable
+fun AppGhostButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
+    contentColor: Color = AccentBlue,
+    fontSize: TextUnit = 14.sp
+) {
+    TextButton(
+        onClick = onClick,
+        modifier = modifier.defaultMinSize(minHeight = 44.dp),
+        colors = ButtonDefaults.textButtonColors(contentColor = contentColor),
+        shape = AppButtonSmallShape
+    ) {
+        if (icon != null) {
+            Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+        }
+        Text(text = text, fontSize = fontSize, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+/**
+ * Animated Shimmer skeleton loader box for smooth loading states.
+ */
+@Composable
+fun AppSkeletonBox(
+    modifier: Modifier = Modifier,
+    shape: Shape = RoundedCornerShape(8.dp)
+) {
+    val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "shimmer")
+    val alpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 0.85f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            animation = androidx.compose.animation.core.tween(900),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+        ),
+        label = "shimmerAlpha"
+    )
+
+    Box(
+        modifier = modifier
+            .clip(shape)
+            .background(DarkSurfaceVariant.copy(alpha = alpha))
+    )
+}
+
+/**
+ * Shimmer loader for chat conversations list.
+ */
+@Composable
+fun AppChatListSkeleton(
+    count: Int = 5,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        repeat(count) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                AppSkeletonBox(modifier = Modifier.size(52.dp), shape = CircleShape)
+                Spacer(modifier = Modifier.width(14.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    AppSkeletonBox(modifier = Modifier.width(130.dp).height(16.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    AppSkeletonBox(modifier = Modifier.fillMaxWidth(0.7f).height(12.dp))
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                AppSkeletonBox(modifier = Modifier.width(40.dp).height(10.dp))
+            }
+        }
+    }
+}
+

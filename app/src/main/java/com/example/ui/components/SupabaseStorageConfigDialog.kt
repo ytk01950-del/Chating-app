@@ -191,35 +191,35 @@ fun SupabaseStorageConfigDialog(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text("Supabase URL:", color = TextMuted, fontSize = 11.sp)
+                            Text("SUPABASE_URL detected:", color = TextMuted, fontSize = 11.sp)
                             Text(
-                                text = if (configStatus.hasUrl) "Detected (YES)" else "Missing (NO)",
+                                text = configStatus.urlDetected,
                                 color = if (configStatus.hasUrl) OnlineGreen else Color(0xFFEF5350),
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
-                        Spacer(modifier = Modifier.height(2.dp))
+                        Spacer(modifier = Modifier.height(3.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text("Public Key:", color = TextMuted, fontSize = 11.sp)
+                            Text("SUPABASE_PUBLIC_KEY detected:", color = TextMuted, fontSize = 11.sp)
                             Text(
-                                text = if (configStatus.hasKey) "Detected (${configStatus.keyTypeDisplay})" else "Missing (NO)",
+                                text = configStatus.publicKeyDetected,
                                 color = if (configStatus.hasKey) OnlineGreen else Color(0xFFEF5350),
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
-                        Spacer(modifier = Modifier.height(2.dp))
+                        Spacer(modifier = Modifier.height(3.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text("Key Format:", color = TextMuted, fontSize = 11.sp)
+                            Text("Key Type:", color = TextMuted, fontSize = 11.sp)
                             Text(
-                                text = configStatus.keyMasked,
+                                text = configStatus.keyTypeDisplay,
                                 color = TextSecondary,
                                 fontSize = 10.sp,
                                 fontFamily = FontFamily.Monospace

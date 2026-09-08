@@ -9,71 +9,112 @@ plugins {
   alias(libs.plugins.google.services)
 }
 
-// Ensure environment variables from AI Studio container runtime (System.getenv)
-// are synchronized into root .env file so the Secrets Gradle Plugin generates BuildConfig fields.
+// Comprehensive secret resolver for AI Studio environment variables, Gradle properties, and .env files
 val rootEnvFile = rootProject.file(".env")
+val appEnvFile = project.file(".env")
 val existingEnvMap = mutableMapOf<String, String>()
 
-if (rootEnvFile.exists()) {
-  rootEnvFile.readLines().forEach { line ->
-    val trimmed = line.trim()
-    if (trimmed.isNotEmpty() && !trimmed.startsWith("#") && trimmed.contains("=")) {
-      val parts = trimmed.split("=", limit = 2)
-      if (parts.size == 2) {
-        val key = parts[0].trim()
-        val value = parts[1].trim()
-        if (value.isNotEmpty()) {
-          existingEnvMap[key] = value
+listOf(rootEnvFile, appEnvFile).forEach { envFile ->
+  if (envFile.exists()) {
+    try {
+      envFile.readLines().forEach { line ->
+        val trimmed = line.trim()
+        if (trimmed.isNotEmpty() && !trimmed.startsWith("#") && trimmed.contains("=")) {
+          val parts = trimmed.split("=", limit = 2)
+          if (parts.size == 2) {
+            val key = parts[0].trim()
+            val value = parts[1].trim()
+            if (value.isNotEmpty() && !existingEnvMap.containsKey(key)) {
+              existingEnvMap[key] = value
+            }
+          }
         }
       }
+    } catch (e: Exception) {
+      // Ignored
     }
   }
+}
+
+fun isPlaceholder(v: String?): Boolean {
+  if (v.isNullOrBlank()) return true
+  val t = v.trim().lowercase()
+  return t == "null" || t == "none" || t.contains("your-") || t.contains("example.com") || t.contains("placeholder") || t.contains("dummy")
 }
 
 fun resolveAnySecret(vararg keys: String): String {
   for (k in keys) {
+    // 1. Direct System.getenv
     val envVal = System.getenv(k)
-    if (!envVal.isNullOrBlank()) return envVal.trim()
-    val propVal = project.findProperty(k) as? String
-    if (!propVal.isNullOrBlank()) return propVal.trim()
+    if (!isPlaceholder(envVal)) return envVal!!.trim()
+    
+    // 2. Case-insensitive System.getenv search
+    val caseMatch = System.getenv().entries.firstOrNull { it.key.equals(k, ignoreCase = true) }?.value
+    if (!isPlaceholder(caseMatch)) return caseMatch!!.trim()
+
+    // 3. System properties
+    val sysProp = System.getProperty(k)
+    if (!isPlaceholder(sysProp)) return sysProp!!.trim()
+
+    // 4. Gradle project property
+    val propVal = (project.findProperty(k) ?: rootProject.findProperty(k)) as? String
+    if (!isPlaceholder(propVal)) return propVal!!.trim()
+
+    // 5. Existing .env map
     val fromMap = existingEnvMap[k]
-    if (!fromMap.isNullOrBlank() && !fromMap.contains("placeholder") && !fromMap.contains("your-") && !fromMap.contains("dummy")) {
-      return fromMap.trim()
-    }
+    if (!isPlaceholder(fromMap)) return fromMap!!.trim()
   }
   return ""
 }
 
-val resolvedSupabaseUrl = resolveAnySecret("SUPABASE_URL", "VITE_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL", "REACT_APP_SUPABASE_URL")
-val resolvedSupabaseKey = resolveAnySecret(
+// 1. Supabase Project URL
+val resolvedSupabaseUrl = resolveAnySecret(
+  "SUPABASE_URL",
+  "VITE_SUPABASE_URL",
+  "NEXT_PUBLIC_SUPABASE_URL",
+  "REACT_APP_SUPABASE_URL",
+  "SUPABASE_PROJECT_URL"
+)
+
+// 2. Supabase Publishable Key (Preferred)
+val resolvedSupabasePublishableKey = resolveAnySecret(
   "SUPABASE_PUBLISHABLE_KEY",
+  "VITE_SUPABASE_PUBLISHABLE_KEY",
+  "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"
+)
+
+// 3. Supabase Anon Key (Fallback)
+val resolvedSupabaseAnonKey = resolveAnySecret(
   "SUPABASE_ANON_KEY",
   "SUPABASE_PUBLIC_KEY",
   "SUPABASE_KEY",
   "VITE_SUPABASE_ANON_KEY",
-  "VITE_SUPABASE_PUBLISHABLE_KEY",
-  "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-  "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"
+  "NEXT_PUBLIC_SUPABASE_ANON_KEY"
 )
 
-if (resolvedSupabaseUrl.isNotEmpty()) {
-  existingEnvMap["SUPABASE_URL"] = resolvedSupabaseUrl
-}
-if (resolvedSupabaseKey.isNotEmpty()) {
-  existingEnvMap["SUPABASE_ANON_KEY"] = resolvedSupabaseKey
-  existingEnvMap["SUPABASE_PUBLISHABLE_KEY"] = resolvedSupabaseKey
+// Effective public key: Prefer publishable key, fall back to anon key
+val resolvedSupabaseEffectiveKey = if (resolvedSupabasePublishableKey.isNotBlank()) {
+  resolvedSupabasePublishableKey
+} else {
+  resolvedSupabaseAnonKey
 }
 
 val geminiKey = resolveAnySecret("GEMINI_API_KEY", "VITE_GEMINI_API_KEY")
-if (geminiKey.isNotEmpty()) {
-  existingEnvMap["GEMINI_API_KEY"] = geminiKey
-}
 
-val envBuilder = StringBuilder()
-existingEnvMap.forEach { (k, v) ->
-  envBuilder.append("$k=$v\n")
+// Write back resolved secrets to root .env if missing so other plugins have access
+try {
+  if (resolvedSupabaseUrl.isNotBlank()) existingEnvMap["SUPABASE_URL"] = resolvedSupabaseUrl
+  if (resolvedSupabasePublishableKey.isNotBlank()) existingEnvMap["SUPABASE_PUBLISHABLE_KEY"] = resolvedSupabasePublishableKey
+  if (resolvedSupabaseAnonKey.isNotBlank()) existingEnvMap["SUPABASE_ANON_KEY"] = resolvedSupabaseAnonKey
+  if (geminiKey.isNotBlank()) existingEnvMap["GEMINI_API_KEY"] = geminiKey
+
+  if (existingEnvMap.isNotEmpty()) {
+    val envContent = existingEnvMap.entries.joinToString("\n") { "${it.key}=${it.value}" } + "\n"
+    rootEnvFile.writeText(envContent)
+  }
+} catch (e: Exception) {
+  // Ignored in read-only setups
 }
-rootEnvFile.writeText(envBuilder.toString())
 
 android {
   namespace = "com.example"
@@ -88,10 +129,13 @@ android {
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
+    buildConfigField("String", "SUPABASE_URL", "\"${resolvedSupabaseUrl.replace("\"", "\\\"")}\"")
+    buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"${resolvedSupabasePublishableKey.replace("\"", "\\\"")}\"")
+    buildConfigField("String", "SUPABASE_ANON_KEY", "\"${resolvedSupabaseAnonKey.replace("\"", "\\\"")}\"")
     buildConfigField("String", "ENV_SUPABASE_URL", "\"${resolvedSupabaseUrl.replace("\"", "\\\"")}\"")
-    buildConfigField("String", "ENV_SUPABASE_KEY", "\"${resolvedSupabaseKey.replace("\"", "\\\"")}\"")
-    buildConfigField("String", "ENV_SUPABASE_ANON_KEY", "\"${resolvedSupabaseKey.replace("\"", "\\\"")}\"")
-    buildConfigField("String", "ENV_SUPABASE_PUBLISHABLE_KEY", "\"${resolvedSupabaseKey.replace("\"", "\\\"")}\"")
+    buildConfigField("String", "ENV_SUPABASE_KEY", "\"${resolvedSupabaseEffectiveKey.replace("\"", "\\\"")}\"")
+    buildConfigField("String", "ENV_SUPABASE_ANON_KEY", "\"${resolvedSupabaseAnonKey.replace("\"", "\\\"")}\"")
+    buildConfigField("String", "ENV_SUPABASE_PUBLISHABLE_KEY", "\"${resolvedSupabasePublishableKey.replace("\"", "\\\"")}\"")
   }
 
   signingConfigs {
@@ -140,6 +184,9 @@ secrets {
   propertiesFileName = ".env"
   defaultPropertiesFileName = ".env.example"
   ignoreList.add("FIREBASE_APPCHECK_DEBUG_TOKEN")
+  ignoreList.add("SUPABASE_URL")
+  ignoreList.add("SUPABASE_ANON_KEY")
+  ignoreList.add("SUPABASE_PUBLISHABLE_KEY")
 }
 
 googleServices { missingGoogleServicesStrategy = MissingGoogleServicesStrategy.WARN }

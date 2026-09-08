@@ -38,6 +38,8 @@ object SupabaseConfigManager {
         val isConfigured: Boolean,
         val hasUrl: Boolean,
         val hasKey: Boolean,
+        val urlDetected: String, // "YES" or "NO"
+        val publicKeyDetected: String, // "YES" or "NO"
         val urlDisplay: String,
         val keyTypeDisplay: String,
         val keyMasked: String,
@@ -154,6 +156,7 @@ object SupabaseConfigManager {
     /**
      * Retrieves the active Supabase Anon / Publishable Public Key.
      * Supports both SUPABASE_PUBLISHABLE_KEY and SUPABASE_ANON_KEY naming conventions.
+     * Strictly prefers SUPABASE_PUBLISHABLE_KEY first, and falls back to SUPABASE_ANON_KEY.
      */
     fun getAnonKey(context: Context? = null): String {
         // 1. Check SharedPreferences (user in-app override)
@@ -168,16 +171,24 @@ object SupabaseConfigManager {
             }
         }
 
-        // 2. Check direct environment injection (BuildConfig.ENV_SUPABASE_KEY / PUBLISHABLE / ANON)
-        val candidates = listOf(
-            try { BuildConfig.ENV_SUPABASE_KEY } catch (e: Throwable) { "" },
-            try { BuildConfig.ENV_SUPABASE_PUBLISHABLE_KEY } catch (e: Throwable) { "" },
-            try { BuildConfig.ENV_SUPABASE_ANON_KEY } catch (e: Throwable) { "" },
+        // 2. Strict preference order: Prefer SUPABASE_PUBLISHABLE_KEY, then SUPABASE_ANON_KEY
+        val candidatePublishableKeys = listOf(
             try { BuildConfig.SUPABASE_PUBLISHABLE_KEY } catch (e: Throwable) { "" },
-            try { BuildConfig.SUPABASE_ANON_KEY } catch (e: Throwable) { "" }
+            try { BuildConfig.ENV_SUPABASE_PUBLISHABLE_KEY } catch (e: Throwable) { "" }
         )
+        for (candidate in candidatePublishableKeys) {
+            val trimmed = candidate.trim()
+            if (trimmed.isNotBlank() && !isPlaceholderKey(trimmed)) {
+                return trimmed
+            }
+        }
 
-        for (candidate in candidates) {
+        val candidateAnonKeys = listOf(
+            try { BuildConfig.SUPABASE_ANON_KEY } catch (e: Throwable) { "" },
+            try { BuildConfig.ENV_SUPABASE_ANON_KEY } catch (e: Throwable) { "" },
+            try { BuildConfig.ENV_SUPABASE_KEY } catch (e: Throwable) { "" }
+        )
+        for (candidate in candidateAnonKeys) {
             val trimmed = candidate.trim()
             if (trimmed.isNotBlank() && !isPlaceholderKey(trimmed)) {
                 return trimmed
@@ -188,12 +199,33 @@ object SupabaseConfigManager {
     }
 
     /**
+     * Safe runtime detection checks.
+     */
+    fun isUrlDetected(context: Context? = null): Boolean {
+        val url = getProjectUrl(context)
+        return url.isNotBlank() && !isPlaceholderUrl(url)
+    }
+
+    fun isPublicKeyDetected(context: Context? = null): Boolean {
+        val key = getAnonKey(context)
+        return key.isNotBlank() && !isPlaceholderKey(key)
+    }
+
+    /**
      * Checks if Supabase Storage has a valid, non-placeholder configuration.
      */
     fun isConfigured(context: Context? = null): Boolean {
-        val url = getProjectUrl(context)
-        val key = getAnonKey(context)
-        return url.isNotBlank() && !isPlaceholderUrl(url) && key.isNotBlank() && !isPlaceholderKey(key)
+        return isUrlDetected(context) && isPublicKeyDetected(context)
+    }
+
+    /**
+     * Logs safe runtime diagnostics without exposing any secret values.
+     */
+    fun logRuntimeDiagnostics(context: Context? = null) {
+        val urlDetected = if (isUrlDetected(context)) "YES" else "NO"
+        val keyDetected = if (isPublicKeyDetected(context)) "YES" else "NO"
+        Log.i(TAG, "SUPABASE_URL detected = $urlDetected")
+        Log.i(TAG, "SUPABASE_PUBLIC_KEY detected = $keyDetected")
     }
 
     /**
@@ -202,8 +234,8 @@ object SupabaseConfigManager {
     fun getConfigStatus(context: Context? = null): ConfigStatus {
         val url = getProjectUrl(context)
         val key = getAnonKey(context)
-        val hasUrl = url.isNotBlank() && !isPlaceholderUrl(url)
-        val hasKey = key.isNotBlank() && !isPlaceholderKey(key)
+        val hasUrl = isUrlDetected(context)
+        val hasKey = isPublicKeyDetected(context)
         val configured = hasUrl && hasKey
 
         val keyType = when {
@@ -214,7 +246,7 @@ object SupabaseConfigManager {
         }
 
         val msg = if (configured) {
-            "Supabase Storage is ready (URL: $url, Key: $keyType)"
+            "Supabase Storage is ready"
         } else {
             buildString {
                 append("Supabase Storage is not ready: ")
@@ -227,6 +259,8 @@ object SupabaseConfigManager {
             isConfigured = configured,
             hasUrl = hasUrl,
             hasKey = hasKey,
+            urlDetected = if (hasUrl) "YES" else "NO",
+            publicKeyDetected = if (hasKey) "YES" else "NO",
             urlDisplay = if (hasUrl) url else "Not detected",
             keyTypeDisplay = keyType,
             keyMasked = maskKey(key),

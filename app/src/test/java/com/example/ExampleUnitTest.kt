@@ -30,13 +30,28 @@ class ExampleUnitTest {
         assertFalse(SupabaseConfigManager.isPlaceholderUrl("https://myrealproject123.supabase.co"))
 
         assertTrue(SupabaseConfigManager.isPlaceholderKey("your-supabase-anon-key"))
+        assertTrue(SupabaseConfigManager.isPlaceholderKey("your-supabase-publishable-key"))
         assertTrue(SupabaseConfigManager.isPlaceholderKey(""))
+        assertFalse(SupabaseConfigManager.isPlaceholderKey("sb_publishable_abcdef1234567890"))
         assertFalse(SupabaseConfigManager.isPlaceholderKey("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.realkey"))
+    }
+
+    @Test
+    fun testSupabaseConfigManager_keyMasking() {
+        val maskedJwt = SupabaseConfigManager.maskKey("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.realkey")
+        assertTrue(maskedJwt.startsWith("eyJhbG..."))
+        assertFalse(maskedJwt.contains("realkey"))
+
+        val maskedPub = SupabaseConfigManager.maskKey("sb_publishable_abcdef1234567890")
+        assertTrue(maskedPub.startsWith("sb_pub..."))
     }
 
     @Test
     fun testSupabaseStorageService_publicUrlGeneration() {
         val publicUrl = SupabaseStorageService.getPublicUrl("profile-photos", "user123/avatar.jpg")
         assertTrue(publicUrl.contains("/storage/v1/object/public/profile-photos/user123/avatar.jpg"))
+        
+        val chatMediaUrl = SupabaseStorageService.getPublicUrl("chat-media", "chat1/msg2/photo.jpg")
+        assertTrue(chatMediaUrl.contains("/storage/v1/object/public/chat-media/chat1/msg2/photo.jpg"))
     }
 }
