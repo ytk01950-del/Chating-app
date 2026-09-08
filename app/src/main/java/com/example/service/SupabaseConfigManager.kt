@@ -42,7 +42,11 @@ object SupabaseConfigManager {
                 trimmed.contains("your-project-ref") ||
                 trimmed.contains("chating-free-storage") ||
                 trimmed.contains("sample") ||
-                trimmed.contains("example.com")
+                trimmed.contains("example.com") ||
+                trimmed.contains("pasand") ||
+                trimmed.contains("placeholder") ||
+                trimmed.contains("dummy") ||
+                trimmed == "none"
     }
 
     /**
@@ -53,7 +57,11 @@ object SupabaseConfigManager {
         return trimmed.isBlank() ||
                 trimmed.contains("your-supabase-anon-key") ||
                 trimmed.contains("sample_public_anon_key") ||
-                trimmed.contains("placeholder")
+                trimmed.contains("placeholder") ||
+                trimmed.contains("pasand") ||
+                trimmed.contains("dummy") ||
+                trimmed.contains("your-key") ||
+                trimmed == "none"
     }
 
     /**
