@@ -30,10 +30,16 @@ object SupabaseStorageService {
     private const val TAG = "SupabaseStorage"
     const val MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024L // 50 MB Free tier max limit
 
-    // Standard bucket names as requested
+    // Standard bucket names
     const val BUCKET_PROFILE_PHOTOS = "profile-photos"
-    const val BUCKET_POSTS = "posts"
+    const val BUCKET_STORIES = "stories"
     const val BUCKET_CHAT_MEDIA = "chat-media"
+
+    data class StoryMediaUploadResult(
+        val publicUrl: String,
+        val storagePath: String,
+        val bucket: String
+    )
 
     private val httpClient: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
@@ -184,28 +190,63 @@ object SupabaseStorageService {
     }
 
     /**
-     * Uploads a Post Photo:
-     * Path: posts/{userId}/{postId}/{fileName}
+     * Uploads Story Media (Photo or Video) for the 24-Hour Story system:
+     * Attempts bucket "stories" first; gracefully falls back to "chat-media" if "stories" bucket doesn't exist.
+     * Path: {userId}/{storyId}/story.{ext}
      */
-    suspend fun uploadPostPhoto(
+    suspend fun uploadStoryMedia(
         userId: String,
-        postId: String,
-        imageUri: Uri,
+        storyId: String,
+        uri: Uri,
+        isVideo: Boolean,
         context: Context,
         onProgress: (Float) -> Unit = {}
-    ): Result<String> {
-        val imageBytes = FileUtils.compressImageForUpload(context, imageUri, maxDimension = 1920, quality = 85)
-            ?: return Result.failure(IllegalStateException("Unable to read post image"))
+    ): Result<StoryMediaUploadResult> {
+        val extension = if (isVideo) "mp4" else "jpg"
+        val mimeType = if (isVideo) "video/mp4" else "image/jpeg"
+        val path = "stories/$userId/$storyId/story.$extension"
 
-        val path = "$userId/$postId/post.jpg"
-        return uploadFile(
-            bucket = BUCKET_POSTS,
+        val bytes = if (isVideo) {
+            FileUtils.readBytesFromUri(context, uri)
+                ?: return Result.failure(IllegalStateException("Unable to read selected video file"))
+        } else {
+            FileUtils.compressImageForUpload(context, uri, maxDimension = 1920, quality = 88)
+                ?: return Result.failure(IllegalStateException("Unable to process selected photo"))
+        }
+
+        if (bytes.size > MAX_FILE_SIZE_BYTES) {
+            return Result.failure(IllegalStateException("Story media exceeds 50MB limit (${FileUtils.formatFileSize(bytes.size.toLong())})"))
+        }
+
+        // Try primary bucket BUCKET_STORIES
+        val primaryResult = uploadFile(
+            bucket = BUCKET_STORIES,
             path = path,
-            bytes = imageBytes,
-            mimeType = "image/jpeg",
+            bytes = bytes,
+            mimeType = mimeType,
             context = context,
             onProgress = onProgress
         )
+
+        if (primaryResult.isSuccess) {
+            val url = primaryResult.getOrThrow()
+            return Result.success(StoryMediaUploadResult(url, path, BUCKET_STORIES))
+        }
+
+        // If bucket not found or forbidden, fallback to existing BUCKET_CHAT_MEDIA
+        Log.w(TAG, "Stories bucket upload fallback to chat-media: ${primaryResult.exceptionOrNull()?.message}")
+        val fallbackResult = uploadFile(
+            bucket = BUCKET_CHAT_MEDIA,
+            path = path,
+            bytes = bytes,
+            mimeType = mimeType,
+            context = context,
+            onProgress = onProgress
+        )
+
+        return fallbackResult.map { url ->
+            StoryMediaUploadResult(url, path, BUCKET_CHAT_MEDIA)
+        }
     }
 
     /**

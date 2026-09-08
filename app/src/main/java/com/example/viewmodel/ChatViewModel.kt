@@ -6,8 +6,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.model.ChatMessage
 import com.example.model.MessageType
-import com.example.model.Post
+import com.example.model.Story
 import com.example.model.User
+import com.example.model.UserStoryGroup
 import com.example.repository.FirebaseChatRepository
 import com.example.util.FileUtils
 import kotlinx.coroutines.Job
@@ -59,25 +60,31 @@ class ChatViewModel(
     val infoMessage: StateFlow<String?> = _infoMessage.asStateFlow()
 
     // -------------------------------------------------------------
-    // SOCIAL PROFILE & POSTS STATE
+    // SOCIAL PROFILE & 24-HOUR STORIES STATE
     // -------------------------------------------------------------
     private val _selectedProfileUser = MutableStateFlow<User?>(null)
     val selectedProfileUser: StateFlow<User?> = _selectedProfileUser.asStateFlow()
 
-    private val _userPosts = MutableStateFlow<List<Post>>(emptyList())
-    val userPosts: StateFlow<List<Post>> = _userPosts.asStateFlow()
+    private val _activeStories = MutableStateFlow<List<Story>>(emptyList())
+    val activeStories: StateFlow<List<Story>> = _activeStories.asStateFlow()
+
+    private val _userStories = MutableStateFlow<List<Story>>(emptyList())
+    val userStories: StateFlow<List<Story>> = _userStories.asStateFlow()
 
     private val _isUploadingProfilePhoto = MutableStateFlow(false)
     val isUploadingProfilePhoto: StateFlow<Boolean> = _isUploadingProfilePhoto.asStateFlow()
 
-    private val _isCreatingPost = MutableStateFlow(false)
-    val isCreatingPost: StateFlow<Boolean> = _isCreatingPost.asStateFlow()
+    private val _isCreatingStory = MutableStateFlow(false)
+    val isCreatingStory: StateFlow<Boolean> = _isCreatingStory.asStateFlow()
 
-    private val _postUploadProgress = MutableStateFlow(0f)
-    val postUploadProgress: StateFlow<Float> = _postUploadProgress.asStateFlow()
+    private val _storyUploadProgress = MutableStateFlow(0f)
+    val storyUploadProgress: StateFlow<Float> = _storyUploadProgress.asStateFlow()
 
-    private val _isDeletingPost = MutableStateFlow(false)
-    val isDeletingPost: StateFlow<Boolean> = _isDeletingPost.asStateFlow()
+    private val _isDeletingStory = MutableStateFlow(false)
+    val isDeletingStory: StateFlow<Boolean> = _isDeletingStory.asStateFlow()
+
+    private val _activeStoryViewer = MutableStateFlow<Pair<User, List<Story>>?>(null)
+    val activeStoryViewer: StateFlow<Pair<User, List<Story>>?> = _activeStoryViewer.asStateFlow()
 
     // -------------------------------------------------------------
     // CHAT MEDIA UPLOADS STATE
@@ -94,8 +101,27 @@ class ChatViewModel(
     private var messagesJob: Job? = null
     private var typingJob: Job? = null
     private var usersJob: Job? = null
-    private var profilePostsJob: Job? = null
+    private var activeStoriesJob: Job? = null
+    private var profileStoriesJob: Job? = null
     private var typingDebounceJob: Job? = null
+
+    // Grouped active stories for the Instagram/Snapchat style story tray
+    val groupedStories: StateFlow<List<UserStoryGroup>> = combine(_activeStories, _allUsers, _currentUser) { stories, users, current ->
+        val userMap = (users + listOfNotNull(current)).associateBy { it.id }
+        val storiesByUser = stories.groupBy { it.userId }
+        storiesByUser.map { (userId, uStories) ->
+            val u = userMap[userId] ?: User(
+                id = userId,
+                displayName = uStories.firstOrNull()?.userDisplayName.orEmpty().ifBlank { "User" },
+                username = uStories.firstOrNull()?.userUsername.orEmpty(),
+                photoUrl = uStories.firstOrNull()?.userPhotoUrl.orEmpty()
+            )
+            val hasUnseen = uStories.any { story ->
+                current != null && !story.viewers.containsKey(current.id) && story.userId != current.id
+            }
+            UserStoryGroup(user = u, stories = uStories.sortedBy { it.createdAt }, hasUnseenStories = hasUnseen)
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // Filtered users by search query
     val filteredUsers: StateFlow<List<User>> = combine(_allUsers, _searchQuery) { users, query ->
@@ -328,12 +354,15 @@ class ChatViewModel(
             _activeContact.value = null
             _activeMessages.value = emptyList()
             _selectedProfileUser.value = null
-            _userPosts.value = emptyList()
+            _userStories.value = emptyList()
+            _activeStories.value = emptyList()
+            _activeStoryViewer.value = null
             _authUiState.value = AuthUiState.Idle
             usersJob?.cancel()
             messagesJob?.cancel()
             typingJob?.cancel()
-            profilePostsJob?.cancel()
+            activeStoriesJob?.cancel()
+            profileStoriesJob?.cancel()
         }
     }
 
@@ -343,6 +372,14 @@ class ChatViewModel(
             repository.syncFcmToken(currentUserId)
             repository.observeRecentConversations(currentUserId).collect { userList ->
                 _allUsers.value = userList
+            }
+        }
+
+        // Real-time active 24-hour stories observer
+        activeStoriesJob?.cancel()
+        activeStoriesJob = viewModelScope.launch {
+            repository.observeActiveStories().collect { stories ->
+                _activeStories.value = stories
             }
         }
 
@@ -510,15 +547,15 @@ class ChatViewModel(
     }
 
     // -------------------------------------------------------------
-    // SOCIAL PROFILE OPERATIONS
+    // SOCIAL PROFILE & 24-HOUR STORY OPERATIONS
     // -------------------------------------------------------------
 
     fun openUserProfile(user: User) {
         _selectedProfileUser.value = user
-        profilePostsJob?.cancel()
-        profilePostsJob = viewModelScope.launch {
-            repository.observeUserPosts(user.id).collect { posts ->
-                _userPosts.value = posts
+        profileStoriesJob?.cancel()
+        profileStoriesJob = viewModelScope.launch {
+            repository.observeUserStories(user.id).collect { stories ->
+                _userStories.value = stories
             }
         }
     }
@@ -529,9 +566,26 @@ class ChatViewModel(
     }
 
     fun closeUserProfile() {
-        profilePostsJob?.cancel()
+        profileStoriesJob?.cancel()
         _selectedProfileUser.value = null
-        _userPosts.value = emptyList()
+        _userStories.value = emptyList()
+    }
+
+    fun openStoryViewer(user: User, stories: List<Story>) {
+        if (stories.isNotEmpty()) {
+            _activeStoryViewer.value = Pair(user, stories)
+        }
+    }
+
+    fun closeStoryViewer() {
+        _activeStoryViewer.value = null
+    }
+
+    fun markStoryViewed(storyId: String) {
+        val current = _currentUser.value ?: return
+        viewModelScope.launch {
+            repository.markStoryViewed(storyId, current.id)
+        }
     }
 
     fun uploadProfilePhoto(uri: Uri, context: Context) {
@@ -560,58 +614,70 @@ class ChatViewModel(
         }
     }
 
-    fun createPost(imageUri: Uri, caption: String, context: Context, onComplete: () -> Unit = {}) {
+    fun createStory(mediaUri: Uri, isVideo: Boolean, caption: String, context: Context, onComplete: () -> Unit = {}) {
         val current = _currentUser.value ?: return
-        _isCreatingPost.value = true
-        _postUploadProgress.value = 0f
+        _isCreatingStory.value = true
+        _storyUploadProgress.value = 0f
 
         viewModelScope.launch {
-            val result = repository.createPost(
+            val result = repository.createStory(
                 userId = current.id,
                 user = current,
-                imageUri = imageUri,
+                mediaUri = mediaUri,
+                isVideo = isVideo,
                 caption = caption,
                 context = context,
-                onProgress = { _postUploadProgress.value = it }
+                onProgress = { _storyUploadProgress.value = it }
             )
 
-            _isCreatingPost.value = false
-            _postUploadProgress.value = 0f
+            _isCreatingStory.value = false
+            _storyUploadProgress.value = 0f
 
             result.onSuccess {
-                _infoMessage.value = "Photo published to your profile!"
+                _infoMessage.value = "Story shared for 24 hours!"
                 onComplete()
             }.onFailure { err ->
-                _errorMessage.value = "Failed to publish post: ${err.localizedMessage}"
+                _errorMessage.value = "Failed to share story: ${err.localizedMessage ?: "Upload error"}"
             }
         }
     }
 
-    fun deletePost(post: Post) {
+    fun deleteStory(story: Story) {
         val current = _currentUser.value ?: return
-        if (post.userId != current.id) {
-            _errorMessage.value = "You can only delete your own posts"
+        if (story.userId != current.id) {
+            _errorMessage.value = "You can only delete your own stories"
             return
         }
 
-        _isDeletingPost.value = true
+        _isDeletingStory.value = true
         viewModelScope.launch {
-            val result = repository.deletePost(current.id, post.postId, post.imageUrl)
-            _isDeletingPost.value = false
+            val result = repository.deleteStory(current.id, story.storyId, story.mediaUrl)
+            _isDeletingStory.value = false
             result.onSuccess {
-                _infoMessage.value = "Post deleted"
+                _infoMessage.value = "Story deleted"
+                // If viewer is open on this story, close or update viewer
+                val viewerState = _activeStoryViewer.value
+                if (viewerState != null) {
+                    val remainingStories = viewerState.second.filter { it.storyId != story.storyId }
+                    if (remainingStories.isEmpty()) {
+                        _activeStoryViewer.value = null
+                    } else {
+                        _activeStoryViewer.value = Pair(viewerState.first, remainingStories)
+                    }
+                }
             }.onFailure { err ->
-                _errorMessage.value = "Failed to delete post: ${err.localizedMessage}"
+                _errorMessage.value = "Failed to delete story: ${err.localizedMessage ?: "Delete error"}"
             }
         }
     }
 
-    fun updateProfile(displayName: String, statusMessage: String, avatarId: Int) {
+    fun updateProfile(displayName: String, statusMessage: String, avatarId: Int, gender: String = "Male") {
         val current = _currentUser.value ?: return
         val updated = current.copy(
             displayName = displayName.trim().ifBlank { current.displayName },
             statusMessage = statusMessage.trim().ifBlank { current.statusMessage },
-            avatarId = avatarId
+            avatarId = avatarId,
+            gender = gender.ifBlank { current.gender }
         )
         _currentUser.value = updated
         if (_selectedProfileUser.value?.id == current.id) {
@@ -623,13 +689,14 @@ class ChatViewModel(
         }
     }
 
-    fun updateProfileDetails(displayName: String, bio: String, statusMessage: String, avatarId: Int) {
+    fun updateProfileDetails(displayName: String, bio: String, statusMessage: String, avatarId: Int, gender: String = "Male") {
         val current = _currentUser.value ?: return
         val updated = current.copy(
             displayName = displayName.trim().ifBlank { current.displayName },
             bio = bio.trim(),
             statusMessage = statusMessage.trim().ifBlank { current.statusMessage },
-            avatarId = avatarId
+            avatarId = avatarId,
+            gender = gender.ifBlank { current.gender }
         )
         _currentUser.value = updated
         if (_selectedProfileUser.value?.id == current.id) {

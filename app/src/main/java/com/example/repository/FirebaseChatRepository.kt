@@ -5,7 +5,7 @@ import android.net.Uri
 import android.util.Log
 import com.example.model.ChatMessage
 import com.example.model.MessageType
-import com.example.model.Post
+import com.example.model.Story
 import com.example.model.User
 import com.example.service.SupabaseStorageService
 import com.example.util.FileUtils
@@ -16,9 +16,12 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.tasks.await
 import java.io.InputStream
@@ -771,129 +774,226 @@ class FirebaseChatRepository {
         }
     }
 
-    suspend fun createPost(
+    // -------------------------------------------------------------
+    // 24-HOUR STORY SYSTEM
+    // -------------------------------------------------------------
+
+    suspend fun createStory(
         userId: String,
         user: User,
-        imageUri: Uri,
+        mediaUri: Uri,
+        isVideo: Boolean,
         caption: String,
         context: Context,
         onProgress: (Float) -> Unit = {}
-    ): Result<Post> {
+    ): Result<Story> {
         return try {
-            Log.d(tag, "Starting createPost for user: $userId, uri: $imageUri")
-            val postId = "post_${System.currentTimeMillis()}_${(1000..9999).random()}"
+            Log.d(tag, "Starting createStory for user: $userId, uri: $mediaUri, isVideo: $isVideo")
+            val storyId = "story_${System.currentTimeMillis()}_${(1000..9999).random()}"
+            val createdAt = System.currentTimeMillis()
+            val expiresAt = createdAt + (24 * 60 * 60 * 1000L) // Exactly 24 Hours
 
-            val uploadResult = SupabaseStorageService.uploadPostPhoto(
+            val uploadResult = SupabaseStorageService.uploadStoryMedia(
                 userId = userId,
-                postId = postId,
-                imageUri = imageUri,
+                storyId = storyId,
+                uri = mediaUri,
+                isVideo = isVideo,
                 context = context,
                 onProgress = onProgress
             )
 
             uploadResult.fold(
-                onSuccess = { downloadUrl ->
-                    Log.d(tag, "Supabase post image uploaded successfully. Download URL: $downloadUrl")
+                onSuccess = { mediaRes ->
+                    Log.d(tag, "Supabase story media uploaded. URL: ${mediaRes.publicUrl}")
 
-                    val post = Post(
-                        postId = postId,
+                    val story = Story(
+                        storyId = storyId,
                         userId = userId,
                         userDisplayName = user.displayName.ifBlank { user.username },
                         userUsername = user.username,
                         userPhotoUrl = user.photoUrl,
-                        imageUrl = downloadUrl,
+                        mediaUrl = mediaRes.publicUrl,
+                        storagePath = mediaRes.storagePath,
+                        mediaType = if (isVideo) "video" else "image",
                         caption = caption.trim(),
-                        timestamp = System.currentTimeMillis()
+                        createdAt = createdAt,
+                        expiresAt = expiresAt,
+                        status = "active"
                     )
 
-                    // Save post in user's posts in Firebase database
-                    database.getReference("posts").child(userId).child(postId).setValue(post).await()
+                    // 1. Save in global stories node
+                    database.getReference("stories").child(storyId).setValue(story).await()
 
-                    // Update user posts count
+                    // 2. Save index in user_stories
+                    database.getReference("user_stories").child(userId).child(storyId).setValue(story).await()
+
+                    // 3. Update user stories count
                     try {
-                        val postsSnap = database.getReference("posts").child(userId).get().await()
-                        val count = postsSnap.childrenCount.toInt()
-                        database.getReference("users").child(userId).child("postsCount").setValue(count).await()
+                        val activeStoriesSnap = database.getReference("user_stories").child(userId).get().await()
+                        var count = 0
+                        val now = System.currentTimeMillis()
+                        for (child in activeStoriesSnap.children) {
+                            val st = child.getValue(Story::class.java)
+                            if (st != null && st.expiresAt > now && st.status == "active") {
+                                count++
+                            }
+                        }
+                        database.getReference("users").child(userId).child("storiesCount").setValue(count).await()
                     } catch (ex: Exception) {
-                        Log.w(tag, "Posts count update note: ${ex.message}")
+                        Log.w(tag, "Stories count update note: ${ex.message}")
                     }
 
                     onProgress(1f)
-                    Result.success(post)
+                    Result.success(story)
                 },
                 onFailure = { err ->
-                    Log.e(tag, "Failed to upload post image to Supabase: ${err.message}", err)
+                    Log.e(tag, "Failed to upload story media to Supabase: ${err.message}", err)
                     Result.failure(err)
                 }
             )
         } catch (e: Exception) {
-            Log.e(tag, "Exception during createPost: ${e.message}", e)
+            Log.e(tag, "Exception during createStory: ${e.message}", e)
             Result.failure(e)
         }
     }
 
-    fun observeUserPosts(userId: String): Flow<List<Post>> = callbackFlow {
+    fun observeActiveStories(): Flow<List<Story>> = callbackFlow {
+        val storiesRef = database.getReference("stories")
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val storyList = mutableListOf<Story>()
+                val expiredList = mutableListOf<Story>()
+                val now = System.currentTimeMillis()
+
+                for (child in snapshot.children) {
+                    val story = child.getValue(Story::class.java)
+                    if (story != null) {
+                        if (story.expiresAt > now && story.status == "active") {
+                            storyList.add(story)
+                        } else {
+                            expiredList.add(story)
+                        }
+                    }
+                }
+
+                storyList.sortByDescending { it.createdAt }
+                trySend(storyList)
+
+                // Background cleanup of expired stories from database & Supabase Storage
+                if (expiredList.isNotEmpty()) {
+                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                        cleanupExpiredStories(expiredList)
+                    }
+                }
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                Log.e(tag, "Active stories observer error: ${error.message}")
+                trySend(emptyList())
+            }
+        }
+        storiesRef.addValueEventListener(listener)
+        awaitClose { storiesRef.removeEventListener(listener) }
+    }
+
+    fun observeUserStories(userId: String): Flow<List<Story>> = callbackFlow {
         if (userId.isBlank()) {
             trySend(emptyList())
             close()
             return@callbackFlow
         }
 
-        val postsRef = database.getReference("posts").child(userId)
+        val userStoriesRef = database.getReference("user_stories").child(userId)
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                val postList = mutableListOf<Post>()
+                val storyList = mutableListOf<Story>()
+                val now = System.currentTimeMillis()
+
                 for (child in snapshot.children) {
-                    val post = child.getValue(Post::class.java)
-                    if (post != null) {
-                        postList.add(post)
+                    val story = child.getValue(Story::class.java)
+                    if (story != null && story.expiresAt > now && story.status == "active") {
+                        storyList.add(story)
                     }
                 }
-                postList.sortByDescending { it.timestamp }
-                trySend(postList)
+                storyList.sortBy { it.createdAt }
+                trySend(storyList)
             }
 
             override fun onCancelled(error: DatabaseError) {
-                Log.e(tag, "User posts observer error: ${error.message}")
+                Log.e(tag, "User stories observer error: ${error.message}")
                 trySend(emptyList())
             }
         }
-        postsRef.addValueEventListener(listener)
-        awaitClose { postsRef.removeEventListener(listener) }
+        userStoriesRef.addValueEventListener(listener)
+        awaitClose { userStoriesRef.removeEventListener(listener) }
     }
 
-    suspend fun deletePost(userId: String, postId: String, imageUrl: String): Result<Unit> {
+    suspend fun deleteStory(userId: String, storyId: String, mediaUrl: String): Result<Unit> {
         return try {
             val currentAuthUid = currentFirebaseUser?.uid.orEmpty()
             if (currentAuthUid != userId) {
-                return Result.failure(IllegalAccessException("You can only delete your own posts"))
+                return Result.failure(IllegalAccessException("You can only delete your own stories"))
             }
 
-            // Remove from Firebase database
-            database.getReference("posts").child(userId).child(postId).removeValue().await()
+            // Remove from Firebase Realtime Database
+            database.getReference("stories").child(storyId).removeValue().await()
+            database.getReference("user_stories").child(userId).child(storyId).removeValue().await()
 
-            // Update user posts count
+            // Update user stories count
             try {
-                val postsSnap = database.getReference("posts").child(userId).get().await()
-                val count = postsSnap.childrenCount.toInt()
-                database.getReference("users").child(userId).child("postsCount").setValue(count).await()
+                val storiesSnap = database.getReference("user_stories").child(userId).get().await()
+                val count = storiesSnap.childrenCount.toInt()
+                database.getReference("users").child(userId).child("storiesCount").setValue(count).await()
             } catch (ex: Exception) {
-                Log.w(tag, "Posts count update note: ${ex.message}")
+                Log.w(tag, "Stories count update note: ${ex.message}")
             }
 
             // Remove file from Supabase Storage
-            if (imageUrl.isNotBlank()) {
+            if (mediaUrl.isNotBlank()) {
                 try {
-                    SupabaseStorageService.deleteFileByUrl(imageUrl)
+                    SupabaseStorageService.deleteFileByUrl(mediaUrl)
                 } catch (delErr: Exception) {
-                    Log.w(tag, "Storage post file deletion note: ${delErr.message}")
+                    Log.w(tag, "Storage story file deletion note: ${delErr.message}")
                 }
             }
 
             Result.success(Unit)
         } catch (e: Exception) {
-            Log.e(tag, "Failed to delete post: ${e.message}", e)
+            Log.e(tag, "Failed to delete story: ${e.message}", e)
             Result.failure(e)
+        }
+    }
+
+    suspend fun markStoryViewed(storyId: String, viewerUserId: String) {
+        if (storyId.isBlank() || viewerUserId.isBlank()) return
+        try {
+            database.getReference("stories")
+                .child(storyId)
+                .child("viewers")
+                .child(viewerUserId)
+                .setValue(System.currentTimeMillis())
+                .await()
+        } catch (e: Exception) {
+            Log.w(tag, "Error marking story viewed: ${e.message}")
+        }
+    }
+
+    private suspend fun cleanupExpiredStories(expiredList: List<Story>) {
+        for (story in expiredList) {
+            try {
+                // Delete from DB
+                database.getReference("stories").child(story.storyId).removeValue().await()
+                if (story.userId.isNotBlank()) {
+                    database.getReference("user_stories").child(story.userId).child(story.storyId).removeValue().await()
+                }
+                // Delete media file from Supabase Storage
+                if (story.mediaUrl.isNotBlank()) {
+                    SupabaseStorageService.deleteFileByUrl(story.mediaUrl)
+                }
+                Log.d(tag, "Cleaned up expired story: ${story.storyId}")
+            } catch (e: Exception) {
+                Log.w(tag, "Error cleaning up expired story ${story.storyId}: ${e.message}")
+            }
         }
     }
 

@@ -9,6 +9,51 @@ plugins {
   alias(libs.plugins.google.services)
 }
 
+// Ensure environment variables from AI Studio container runtime (System.getenv)
+// are synchronized into root .env file so the Secrets Gradle Plugin generates BuildConfig fields.
+val rootEnvFile = rootProject.file(".env")
+val existingEnvMap = mutableMapOf<String, String>()
+
+if (rootEnvFile.exists()) {
+  rootEnvFile.readLines().forEach { line ->
+    val trimmed = line.trim()
+    if (trimmed.isNotEmpty() && !trimmed.startsWith("#") && trimmed.contains("=")) {
+      val parts = trimmed.split("=", limit = 2)
+      if (parts.size == 2) {
+        existingEnvMap[parts[0].trim()] = parts[1].trim()
+      }
+    }
+  }
+}
+
+val secretKeysToSync = listOf("SUPABASE_URL", "SUPABASE_ANON_KEY", "GEMINI_API_KEY")
+var hasNewEnv = false
+for (k in secretKeysToSync) {
+  val envVal = System.getenv(k) ?: (project.findProperty(k) as? String)
+  if (!envVal.isNullOrBlank()) {
+    existingEnvMap[k] = envVal.trim()
+    hasNewEnv = true
+  }
+}
+
+if (hasNewEnv || !rootEnvFile.exists()) {
+  val envBuilder = StringBuilder()
+  existingEnvMap.forEach { (k, v) ->
+    envBuilder.append("$k=$v\n")
+  }
+  rootEnvFile.writeText(envBuilder.toString())
+}
+
+val resolvedSupabaseUrl = System.getenv("SUPABASE_URL")
+  ?: (project.findProperty("SUPABASE_URL") as? String)
+  ?: existingEnvMap["SUPABASE_URL"]
+  ?: ""
+
+val resolvedSupabaseAnonKey = System.getenv("SUPABASE_ANON_KEY")
+  ?: (project.findProperty("SUPABASE_ANON_KEY") as? String)
+  ?: existingEnvMap["SUPABASE_ANON_KEY"]
+  ?: ""
+
 android {
   namespace = "com.example"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
@@ -21,6 +66,9 @@ android {
     versionName = "1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+    buildConfigField("String", "ENV_SUPABASE_URL", "\"${resolvedSupabaseUrl.replace("\"", "\\\"")}\"")
+    buildConfigField("String", "ENV_SUPABASE_ANON_KEY", "\"${resolvedSupabaseAnonKey.replace("\"", "\\\"")}\"")
   }
 
   signingConfigs {

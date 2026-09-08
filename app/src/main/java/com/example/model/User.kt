@@ -8,10 +8,12 @@ data class User(
     val avatarId: Int = 0,
     val photoUrl: String = "",
     val bio: String = "",
+    val gender: String = "Male", // "Male" or "Female"
     val statusMessage: String = "Hey there! I am using WP CHAT.",
     val isOnline: Boolean = false,
     val lastSeen: Long = System.currentTimeMillis(),
     val createdAt: Long = System.currentTimeMillis(),
+    val storiesCount: Int = 0,
     val postsCount: Int = 0
 ) {
     fun getInitials(): String {

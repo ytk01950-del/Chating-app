@@ -44,6 +44,7 @@ object SupabaseConfigManager {
                 trimmed.contains("sample") ||
                 trimmed.contains("example.com") ||
                 trimmed.contains("pasand") ||
+                trimmed.contains("flex69") ||
                 trimmed.contains("placeholder") ||
                 trimmed.contains("dummy") ||
                 trimmed == "none"
@@ -59,6 +60,7 @@ object SupabaseConfigManager {
                 trimmed.contains("sample_public_anon_key") ||
                 trimmed.contains("placeholder") ||
                 trimmed.contains("pasand") ||
+                trimmed.contains("flex69") ||
                 trimmed.contains("dummy") ||
                 trimmed.contains("your-key") ||
                 trimmed == "none"
@@ -68,7 +70,7 @@ object SupabaseConfigManager {
      * Retrieves the active Supabase Project URL.
      */
     fun getProjectUrl(context: Context?): String {
-        // 1. Check SharedPreferences if context is available
+        // 1. Check SharedPreferences if context is available (user in-app override)
         if (context != null) {
             try {
                 val saved = getPrefs(context).getString(KEY_PROJECT_URL, null)?.trim()?.removeSuffix("/")
@@ -80,7 +82,16 @@ object SupabaseConfigManager {
             }
         }
 
-        // 2. Check BuildConfig
+        // 2. Check direct environment injection (BuildConfig.ENV_SUPABASE_URL)
+        try {
+            val envUrl = BuildConfig.ENV_SUPABASE_URL.trim().removeSuffix("/")
+            if (envUrl.isNotBlank() && !isPlaceholderUrl(envUrl)) {
+                return formatUrl(envUrl)
+            }
+        } catch (ignored: Throwable) {
+        }
+
+        // 3. Check Secrets Gradle Plugin (BuildConfig.SUPABASE_URL)
         return try {
             val buildConfigUrl = BuildConfig.SUPABASE_URL.trim().removeSuffix("/")
             if (buildConfigUrl.isNotBlank() && !isPlaceholderUrl(buildConfigUrl)) {
@@ -88,7 +99,7 @@ object SupabaseConfigManager {
             } else {
                 ""
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             ""
         }
     }
@@ -97,7 +108,7 @@ object SupabaseConfigManager {
      * Retrieves the active Supabase Anon Public Key.
      */
     fun getAnonKey(context: Context?): String {
-        // 1. Check SharedPreferences
+        // 1. Check SharedPreferences (user in-app override)
         if (context != null) {
             try {
                 val saved = getPrefs(context).getString(KEY_ANON_KEY, null)?.trim()
@@ -109,7 +120,16 @@ object SupabaseConfigManager {
             }
         }
 
-        // 2. Check BuildConfig
+        // 2. Check direct environment injection (BuildConfig.ENV_SUPABASE_ANON_KEY)
+        try {
+            val envKey = BuildConfig.ENV_SUPABASE_ANON_KEY.trim()
+            if (envKey.isNotBlank() && !isPlaceholderKey(envKey)) {
+                return envKey
+            }
+        } catch (ignored: Throwable) {
+        }
+
+        // 3. Check Secrets Gradle Plugin (BuildConfig.SUPABASE_ANON_KEY)
         return try {
             val buildConfigKey = BuildConfig.SUPABASE_ANON_KEY.trim()
             if (buildConfigKey.isNotBlank() && !isPlaceholderKey(buildConfigKey)) {
@@ -117,7 +137,7 @@ object SupabaseConfigManager {
             } else {
                 ""
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             ""
         }
     }

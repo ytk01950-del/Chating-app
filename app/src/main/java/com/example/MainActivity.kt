@@ -11,6 +11,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedContent
@@ -27,7 +28,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
@@ -35,7 +38,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.screens.AuthScreen
 import com.example.ui.screens.ChatDetailScreen
+import com.example.ui.screens.CreateStoryDialog
 import com.example.ui.screens.SocialProfileScreen
+import com.example.ui.screens.StoryViewerDialog
 import com.example.ui.screens.UserDirectoryScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.example.util.WpChatNotificationHelper
@@ -96,18 +101,37 @@ fun WpChatApp(
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
     val infoMessage by viewModel.infoMessage.collectAsStateWithLifecycle()
 
-    // Social profile & Posts state
+    // Social profile & 24-Hour Stories state
     val selectedProfileUser by viewModel.selectedProfileUser.collectAsStateWithLifecycle()
-    val userPosts by viewModel.userPosts.collectAsStateWithLifecycle()
+    val userStories by viewModel.userStories.collectAsStateWithLifecycle()
+    val activeStories by viewModel.activeStories.collectAsStateWithLifecycle()
+    val groupedStories by viewModel.groupedStories.collectAsStateWithLifecycle()
     val isUploadingProfilePhoto by viewModel.isUploadingProfilePhoto.collectAsStateWithLifecycle()
-    val isCreatingPost by viewModel.isCreatingPost.collectAsStateWithLifecycle()
-    val postUploadProgress by viewModel.postUploadProgress.collectAsStateWithLifecycle()
-    val isDeletingPost by viewModel.isDeletingPost.collectAsStateWithLifecycle()
+    val isCreatingStory by viewModel.isCreatingStory.collectAsStateWithLifecycle()
+    val storyUploadProgress by viewModel.storyUploadProgress.collectAsStateWithLifecycle()
+    val isDeletingStory by viewModel.isDeletingStory.collectAsStateWithLifecycle()
+    val activeStoryViewer by viewModel.activeStoryViewer.collectAsStateWithLifecycle()
 
     // Chat Media uploads state
     val isUploadingMedia by viewModel.isUploadingMedia.collectAsStateWithLifecycle()
     val mediaUploadProgress by viewModel.mediaUploadProgress.collectAsStateWithLifecycle()
     val uploadingFileName by viewModel.uploadingFileName.collectAsStateWithLifecycle()
+
+    // Local dialog state for adding stories directly from directory tray
+    var pendingTrayMediaUri by remember { androidx.compose.runtime.mutableStateOf<android.net.Uri?>(null) }
+    var pendingTrayIsVideo by remember { androidx.compose.runtime.mutableStateOf(false) }
+    var showTrayCreateStoryDialog by remember { androidx.compose.runtime.mutableStateOf(false) }
+
+    val trayStoryPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: android.net.Uri? ->
+        if (uri != null) {
+            val isVid = context.contentResolver.getType(uri)?.startsWith("video/") == true
+            pendingTrayMediaUri = uri
+            pendingTrayIsVideo = isVid
+            showTrayCreateStoryDialog = true
+        }
+    }
 
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -201,6 +225,16 @@ fun WpChatApp(
                                 searchResults = searchResults,
                                 isSearchingUser = isSearchingUser,
                                 searchUserNotFound = searchUserNotFound,
+                                myStories = activeStories.filter { it.userId == user.id },
+                                groupedStories = groupedStories,
+                                onOpenAddStory = {
+                                    trayStoryPickerLauncher.launch(
+                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
+                                    )
+                                },
+                                onViewUserStories = { storyUser, stories ->
+                                    viewModel.openStoryViewer(storyUser, stories)
+                                },
                                 onSearchByChatId = { viewModel.searchUserByChatId(it) },
                                 onSearchDirectory = { viewModel.searchDirectory(it) },
                                 onClearChatIdSearch = { viewModel.clearSearchUserResult() },
@@ -221,11 +255,11 @@ fun WpChatApp(
                             SocialProfileScreen(
                                 currentUser = user,
                                 profileUser = profileUser,
-                                posts = userPosts,
+                                stories = userStories,
                                 isUploadingPhoto = isUploadingProfilePhoto,
-                                isCreatingPost = isCreatingPost,
-                                postUploadProgress = postUploadProgress,
-                                isDeletingPost = isDeletingPost,
+                                isCreatingStory = isCreatingStory,
+                                storyUploadProgress = storyUploadProgress,
+                                isDeletingStory = isDeletingStory,
                                 onBack = { viewModel.closeUserProfile() },
                                 onOpenChat = { targetUser ->
                                     viewModel.closeUserProfile()
@@ -234,20 +268,23 @@ fun WpChatApp(
                                 onUploadProfilePhoto = { photoUri ->
                                     viewModel.uploadProfilePhoto(photoUri, context)
                                 },
-                                onCreatePost = { imageUri, caption ->
-                                    viewModel.createPost(imageUri, caption, context)
+                                onCreateStory = { mediaUri, isVideo, caption ->
+                                    viewModel.createStory(mediaUri, isVideo, caption, context)
                                 },
-                                onDeletePost = { post ->
-                                    viewModel.deletePost(post)
+                                onDeleteStory = { story ->
+                                    viewModel.deleteStory(story)
                                 },
-                                onUpdateProfile = { name, bio, status, avatarId ->
-                                    viewModel.updateProfileDetails(name, bio, status, avatarId)
+                                onUpdateProfile = { name, bio, status, avatarId, gender ->
+                                    viewModel.updateProfileDetails(name, bio, status, avatarId, gender)
                                 },
                                 onClaimUsername = { username, callback ->
                                     viewModel.claimUsernameForCurrentUser(username, callback)
                                 },
                                 onCheckUsernameAvailable = { username ->
                                     viewModel.checkUsernameAvailability(username)
+                                },
+                                onStoryViewed = { storyId ->
+                                    viewModel.markStoryViewed(storyId)
                                 }
                             )
                         }
@@ -284,6 +321,45 @@ fun WpChatApp(
                         }
                     }
                 }
+            }
+
+            // Global Full-Screen 24-Hour Story Viewer
+            activeStoryViewer?.let { viewerState ->
+                val current = currentUser
+                if (current != null) {
+                    StoryViewerDialog(
+                        user = viewerState.first,
+                        stories = viewerState.second,
+                        currentUserId = current.id,
+                        initialIndex = 0,
+                        onDismiss = { viewModel.closeStoryViewer() },
+                        onDeleteStory = { story ->
+                            viewModel.deleteStory(story)
+                        },
+                        onStoryViewed = { storyId ->
+                            viewModel.markStoryViewed(storyId)
+                        }
+                    )
+                }
+            }
+
+            // Global Create Story Dialog (e.g. from Directory Story Tray)
+            if (showTrayCreateStoryDialog && pendingTrayMediaUri != null) {
+                CreateStoryDialog(
+                    mediaUri = pendingTrayMediaUri!!,
+                    isVideo = pendingTrayIsVideo,
+                    isUploading = isCreatingStory,
+                    uploadProgress = storyUploadProgress,
+                    onDismiss = {
+                        showTrayCreateStoryDialog = false
+                        pendingTrayMediaUri = null
+                    },
+                    onShareStory = { mediaUri, isVideo, caption ->
+                        viewModel.createStory(mediaUri, isVideo, caption, context)
+                        showTrayCreateStoryDialog = false
+                        pendingTrayMediaUri = null
+                    }
+                )
             }
         }
     }

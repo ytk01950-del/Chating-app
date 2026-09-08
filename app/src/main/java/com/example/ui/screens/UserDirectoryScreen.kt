@@ -73,7 +73,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.model.Story
 import com.example.model.User
+import com.example.model.UserStoryGroup
+import com.example.ui.components.StoryAvatarRing
+import com.example.ui.components.StoryTray
 import com.example.ui.components.UserAvatar
 import com.example.ui.components.AppIconButton
 import com.example.ui.components.AppPrimaryButton
@@ -104,6 +108,10 @@ fun UserDirectoryScreen(
     searchResults: List<User> = emptyList(),
     isSearchingUser: Boolean,
     searchUserNotFound: Boolean,
+    myStories: List<Story> = emptyList(),
+    groupedStories: List<UserStoryGroup> = emptyList(),
+    onOpenAddStory: () -> Unit = {},
+    onViewUserStories: (User, List<Story>) -> Unit = { _, _ -> },
     onSearchByChatId: (String) -> Unit,
     onSearchDirectory: (String) -> Unit = {},
     onClearChatIdSearch: () -> Unit,
@@ -260,6 +268,15 @@ fun UserDirectoryScreen(
                     }
                 }
             }
+
+            // 24-Hour Active Story Tray (Snapchat/Instagram style)
+            StoryTray(
+                currentUser = currentUser,
+                myStories = myStories,
+                otherUsersStories = groupedStories,
+                onOpenAddStory = onOpenAddStory,
+                onViewUserStories = onViewUserStories
+            )
 
             // Mode Tabs: "All Contacts" vs "Search by Chat ID"
             Surface(
@@ -702,8 +719,18 @@ fun UserDirectoryScreen(
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         items(displayedUsers, key = { it.id }) { user ->
+                            val userStoryGroup = groupedStories.firstOrNull { it.user.id == user.id }
                             UserItemCard(
                                 user = user,
+                                userStories = userStoryGroup?.stories ?: emptyList(),
+                                hasUnseenStories = userStoryGroup?.hasUnseenStories ?: false,
+                                onStoryClick = {
+                                    if (userStoryGroup != null && userStoryGroup.stories.isNotEmpty()) {
+                                        onViewUserStories(user, userStoryGroup.stories)
+                                    } else {
+                                        onSelectUser(user)
+                                    }
+                                },
                                 onClick = { onSelectUser(user) }
                             )
                         }
@@ -717,8 +744,13 @@ fun UserDirectoryScreen(
 @Composable
 fun UserItemCard(
     user: User,
+    userStories: List<Story> = emptyList(),
+    hasUnseenStories: Boolean = false,
+    onStoryClick: (() -> Unit)? = null,
     onClick: () -> Unit
 ) {
+    val hasStories = userStories.isNotEmpty()
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -734,13 +766,20 @@ fun UserItemCard(
                 .padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            UserAvatar(
-                name = user.displayName.ifBlank { user.username },
-                avatarId = user.avatarId,
-                photoUrl = user.photoUrl,
-                size = 48.dp,
-                isOnline = user.isOnline
-            )
+            StoryAvatarRing(
+                hasActiveStory = hasStories,
+                hasUnseenStory = hasUnseenStories,
+                size = 52.dp,
+                onClick = onStoryClick
+            ) {
+                UserAvatar(
+                    name = user.displayName.ifBlank { user.username },
+                    avatarId = user.avatarId,
+                    photoUrl = user.photoUrl,
+                    size = if (hasStories) 44.dp else 48.dp,
+                    isOnline = user.isOnline
+                )
+            }
 
             Spacer(modifier = Modifier.width(14.dp))
 
