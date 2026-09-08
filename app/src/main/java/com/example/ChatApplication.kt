@@ -35,6 +35,14 @@ class ChatApplication : Application() {
 
             // Create Android notification channel for chat messages
             com.example.util.WpChatNotificationHelper.createNotificationChannel(this)
+
+            // Supabase Storage runtime diagnostic check
+            val supabaseStatus = com.example.service.SupabaseConfigManager.getConfigStatus(this)
+            Log.i("ChatApplication", "=== Supabase Storage Runtime Diagnostics ===")
+            Log.i("ChatApplication", "Supabase URL Detected: ${if (supabaseStatus.hasUrl) "YES (${supabaseStatus.urlDisplay})" else "NO"}")
+            Log.i("ChatApplication", "Public Key Detected: ${if (supabaseStatus.hasKey) "YES (${supabaseStatus.keyTypeDisplay}, ${supabaseStatus.keyMasked})" else "NO"}")
+            Log.i("ChatApplication", "Storage Configured: ${supabaseStatus.isConfigured}")
+            Log.i("ChatApplication", "=============================================")
         } catch (e: Exception) {
             Log.e("ChatApplication", "FATAL: Application onCreate initialization failed: ${e.message}", e)
         }

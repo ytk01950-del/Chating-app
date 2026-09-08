@@ -20,39 +20,60 @@ if (rootEnvFile.exists()) {
     if (trimmed.isNotEmpty() && !trimmed.startsWith("#") && trimmed.contains("=")) {
       val parts = trimmed.split("=", limit = 2)
       if (parts.size == 2) {
-        existingEnvMap[parts[0].trim()] = parts[1].trim()
+        val key = parts[0].trim()
+        val value = parts[1].trim()
+        if (value.isNotEmpty()) {
+          existingEnvMap[key] = value
+        }
       }
     }
   }
 }
 
-val secretKeysToSync = listOf("SUPABASE_URL", "SUPABASE_ANON_KEY", "GEMINI_API_KEY")
-var hasNewEnv = false
-for (k in secretKeysToSync) {
-  val envVal = System.getenv(k) ?: (project.findProperty(k) as? String)
-  if (!envVal.isNullOrBlank()) {
-    existingEnvMap[k] = envVal.trim()
-    hasNewEnv = true
+fun resolveAnySecret(vararg keys: String): String {
+  for (k in keys) {
+    val envVal = System.getenv(k)
+    if (!envVal.isNullOrBlank()) return envVal.trim()
+    val propVal = project.findProperty(k) as? String
+    if (!propVal.isNullOrBlank()) return propVal.trim()
+    val fromMap = existingEnvMap[k]
+    if (!fromMap.isNullOrBlank() && !fromMap.contains("placeholder") && !fromMap.contains("your-") && !fromMap.contains("dummy")) {
+      return fromMap.trim()
+    }
   }
+  return ""
 }
 
-if (hasNewEnv || !rootEnvFile.exists()) {
-  val envBuilder = StringBuilder()
-  existingEnvMap.forEach { (k, v) ->
-    envBuilder.append("$k=$v\n")
-  }
-  rootEnvFile.writeText(envBuilder.toString())
+val resolvedSupabaseUrl = resolveAnySecret("SUPABASE_URL", "VITE_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL", "REACT_APP_SUPABASE_URL")
+val resolvedSupabaseKey = resolveAnySecret(
+  "SUPABASE_PUBLISHABLE_KEY",
+  "SUPABASE_ANON_KEY",
+  "SUPABASE_PUBLIC_KEY",
+  "SUPABASE_KEY",
+  "VITE_SUPABASE_ANON_KEY",
+  "VITE_SUPABASE_PUBLISHABLE_KEY",
+  "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+  "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"
+)
+
+if (resolvedSupabaseUrl.isNotEmpty()) {
+  existingEnvMap["SUPABASE_URL"] = resolvedSupabaseUrl
+}
+if (resolvedSupabaseKey.isNotEmpty()) {
+  existingEnvMap["SUPABASE_ANON_KEY"] = resolvedSupabaseKey
+  existingEnvMap["SUPABASE_PUBLISHABLE_KEY"] = resolvedSupabaseKey
 }
 
-val resolvedSupabaseUrl = System.getenv("SUPABASE_URL")
-  ?: (project.findProperty("SUPABASE_URL") as? String)
-  ?: existingEnvMap["SUPABASE_URL"]
-  ?: ""
+val geminiKey = resolveAnySecret("GEMINI_API_KEY", "VITE_GEMINI_API_KEY")
+if (geminiKey.isNotEmpty()) {
+  existingEnvMap["GEMINI_API_KEY"] = geminiKey
+}
 
-val resolvedSupabaseAnonKey = System.getenv("SUPABASE_ANON_KEY")
-  ?: (project.findProperty("SUPABASE_ANON_KEY") as? String)
-  ?: existingEnvMap["SUPABASE_ANON_KEY"]
-  ?: ""
+val envBuilder = StringBuilder()
+existingEnvMap.forEach { (k, v) ->
+  envBuilder.append("$k=$v\n")
+}
+rootEnvFile.writeText(envBuilder.toString())
 
 android {
   namespace = "com.example"
@@ -68,7 +89,9 @@ android {
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
     buildConfigField("String", "ENV_SUPABASE_URL", "\"${resolvedSupabaseUrl.replace("\"", "\\\"")}\"")
-    buildConfigField("String", "ENV_SUPABASE_ANON_KEY", "\"${resolvedSupabaseAnonKey.replace("\"", "\\\"")}\"")
+    buildConfigField("String", "ENV_SUPABASE_KEY", "\"${resolvedSupabaseKey.replace("\"", "\\\"")}\"")
+    buildConfigField("String", "ENV_SUPABASE_ANON_KEY", "\"${resolvedSupabaseKey.replace("\"", "\\\"")}\"")
+    buildConfigField("String", "ENV_SUPABASE_PUBLISHABLE_KEY", "\"${resolvedSupabaseKey.replace("\"", "\\\"")}\"")
   }
 
   signingConfigs {

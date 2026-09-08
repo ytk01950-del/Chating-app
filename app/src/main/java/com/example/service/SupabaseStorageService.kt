@@ -16,24 +16,24 @@ import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
 
 /**
- * Service for uploading and managing media files in Supabase Storage Free Tier (100% $0 / ₹0 cost).
+ * Centralized Service for uploading and managing media files in Supabase Storage.
  *
- * Architecture:
- * - Profile photos: bucket "profile-photos", path "{userId}/avatar.{ext}"
- * - Post photos:    bucket "posts",          path "{userId}/{postId}/{fileName}"
+ * Bucket Layout:
  * - Chat media:     bucket "chat-media",     path "{chatId}/{messageId}/{fileName}"
+ * - Profile photos: bucket "profile-photos", path "{userId}/avatar.jpg"
+ * - Stories media:  bucket "stories" (or "chat-media"), path "stories/{userId}/{storyId}/story.{ext}"
  *
- * Free Tier limits: 1 GB total storage, max 50 MB per file.
+ * Free Tier limits: max 50 MB per file.
  */
 object SupabaseStorageService {
 
-    private const val TAG = "SupabaseStorage"
-    const val MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024L // 50 MB Free tier max limit
+    private const val TAG = "SupabaseStorageService"
+    const val MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024L // 50 MB max limit
 
     // Standard bucket names
+    const val BUCKET_CHAT_MEDIA = "chat-media"
     const val BUCKET_PROFILE_PHOTOS = "profile-photos"
     const val BUCKET_STORIES = "stories"
-    const val BUCKET_CHAT_MEDIA = "chat-media"
 
     data class StoryMediaUploadResult(
         val publicUrl: String,
@@ -55,7 +55,7 @@ object SupabaseStorageService {
     }
 
     /**
-     * Resolves the configured Supabase Public / Anon API Key.
+     * Resolves the configured Supabase Public / Anon / Publishable API Key.
      */
     fun getSupabaseAnonKey(context: Context? = null): String {
         return SupabaseConfigManager.getAnonKey(context)
@@ -72,7 +72,7 @@ object SupabaseStorageService {
      * Constructs the public download URL for an object in a Supabase public bucket.
      */
     fun getPublicUrl(bucket: String, path: String, context: Context? = null): String {
-        val baseUrl = getSupabaseUrl(context)
+        val baseUrl = getSupabaseUrl(context).removeSuffix("/")
         val cleanPath = path.trimStart('/')
         return "$baseUrl/storage/v1/object/public/$bucket/$cleanPath"
     }
@@ -90,7 +90,13 @@ object SupabaseStorageService {
         onProgress: (Float) -> Unit = {}
     ): Result<String> = withContext(Dispatchers.IO) {
         if (!SupabaseConfigManager.isConfigured(context)) {
-            val errorMsg = "Supabase Storage URL or Anon Key is not configured yet. Please configure your Supabase Project in Storage Settings (top right in profile) or via the Secrets panel."
+            val status = SupabaseConfigManager.getConfigStatus(context)
+            val errorMsg = buildString {
+                append("Supabase Storage is not configured. ")
+                if (!status.hasUrl) append("Supabase Project URL is missing. ")
+                if (!status.hasKey) append("Supabase Public/Anon key is missing. ")
+                append("Please configure SUPABASE_URL and SUPABASE_ANON_KEY (or SUPABASE_PUBLISHABLE_KEY) in AI Studio Secrets or via Storage Settings.")
+            }
             Log.e(TAG, errorMsg)
             return@withContext Result.failure(IllegalStateException(errorMsg))
         }
@@ -98,7 +104,7 @@ object SupabaseStorageService {
         if (bytes.size > MAX_FILE_SIZE_BYTES) {
             val sizeMb = String.format(java.util.Locale.US, "%.1f", bytes.size.toDouble() / (1024 * 1024))
             return@withContext Result.failure(
-                IllegalArgumentException("File size ($sizeMb MB) exceeds the 50 MB Free Plan upload limit.")
+                IllegalArgumentException("File size ($sizeMb MB) exceeds the 50 MB upload limit.")
             )
         }
 
@@ -106,7 +112,7 @@ object SupabaseStorageService {
             return@withContext Result.failure(IllegalArgumentException("Cannot upload empty file."))
         }
 
-        val baseUrl = getSupabaseUrl(context)
+        val baseUrl = getSupabaseUrl(context).removeSuffix("/")
         val anonKey = getSupabaseAnonKey(context)
         val cleanPath = path.trimStart('/')
 
@@ -129,14 +135,14 @@ object SupabaseStorageService {
             .post(progressBody)
             .build()
 
-        Log.d(TAG, "Uploading ${bytes.size} bytes to Supabase Storage: $uploadUrl (Content-Type: $mimeType)")
+        Log.d(TAG, "Uploading ${bytes.size} bytes to Supabase Storage: $uploadUrl (Content-Type: $mimeType, Key: ${SupabaseConfigManager.maskKey(anonKey)})")
 
         try {
             val response = httpClient.newCall(request).execute()
             val responseBody = response.body?.string().orEmpty()
 
             if (response.isSuccessful) {
-                Log.d(TAG, "Supabase upload succeeded for $bucket/$cleanPath. Response: $responseBody")
+                Log.d(TAG, "Supabase upload succeeded for $bucket/$cleanPath. Public URL: $publicUrl")
                 onProgress(1f)
                 Result.success(publicUrl)
             } else {
@@ -145,18 +151,18 @@ object SupabaseStorageService {
 
                 if (response.code == 404 && responseBody.contains("Bucket not found", ignoreCase = true)) {
                     Result.failure(
-                        IllegalStateException("Supabase bucket '$bucket' not found. Please create public bucket '$bucket' in your Supabase dashboard.")
+                        IllegalStateException("Supabase bucket '$bucket' was not found. Please create public bucket '$bucket' in your Supabase dashboard.")
                     )
                 } else if (response.code == 403 || response.code == 401) {
                     Result.failure(
-                        IllegalStateException("Supabase Storage permission denied. Please ensure bucket '$bucket' is Public and has public INSERT/UPDATE RLS policies enabled.")
+                        IllegalStateException("Supabase Storage permission denied (${response.code}). Please ensure bucket '$bucket' is Public and has INSERT/UPDATE policies enabled.")
                     )
                 } else {
                     Result.failure(IllegalStateException(errorMsg))
                 }
             }
         } catch (e: UnknownHostException) {
-            val error = "Unable to resolve Supabase hostname for '$baseUrl'. Please double check your Supabase Project URL in Storage Settings."
+            val error = "Unable to resolve Supabase hostname for '$baseUrl'. Please check your Supabase Project URL."
             Log.e(TAG, error, e)
             Result.failure(IllegalStateException(error))
         } catch (e: Exception) {
@@ -166,8 +172,35 @@ object SupabaseStorageService {
     }
 
     /**
+     * Uploads Chat Media (Image, Video, Audio, Document, Zip):
+     * Bucket: "chat-media"
+     * Path: chat-media/{chatId}/{messageId}/{fileName}
+     */
+    suspend fun uploadChatMedia(
+        chatId: String,
+        messageId: String,
+        fileName: String,
+        fileBytes: ByteArray,
+        mimeType: String,
+        context: Context? = null,
+        onProgress: (Float) -> Unit = {}
+    ): Result<String> {
+        val sanitized = FileUtils.sanitizeFileName(fileName)
+        val path = "$chatId/$messageId/$sanitized"
+        return uploadFile(
+            bucket = BUCKET_CHAT_MEDIA,
+            path = path,
+            bytes = fileBytes,
+            mimeType = mimeType,
+            context = context,
+            onProgress = onProgress
+        )
+    }
+
+    /**
      * Uploads a Profile Photo:
-     * Path: profile-photos/{userId}/avatar.{extension}
+     * Bucket: "profile-photos"
+     * Path: profile-photos/{userId}/avatar.jpg
      */
     suspend fun uploadProfilePhoto(
         userId: String,
@@ -192,7 +225,7 @@ object SupabaseStorageService {
     /**
      * Uploads Story Media (Photo or Video) for the 24-Hour Story system:
      * Attempts bucket "stories" first; gracefully falls back to "chat-media" if "stories" bucket doesn't exist.
-     * Path: {userId}/{storyId}/story.{ext}
+     * Path: stories/{userId}/{storyId}/story.{ext}
      */
     suspend fun uploadStoryMedia(
         userId: String,
@@ -250,31 +283,6 @@ object SupabaseStorageService {
     }
 
     /**
-     * Uploads Chat Media (Image, Video, Audio, Document, Zip):
-     * Path: chat-media/{chatId}/{messageId}/{fileName}
-     */
-    suspend fun uploadChatMedia(
-        chatId: String,
-        messageId: String,
-        fileName: String,
-        fileBytes: ByteArray,
-        mimeType: String,
-        context: Context? = null,
-        onProgress: (Float) -> Unit = {}
-    ): Result<String> {
-        val sanitized = FileUtils.sanitizeFileName(fileName)
-        val path = "$chatId/$messageId/$sanitized"
-        return uploadFile(
-            bucket = BUCKET_CHAT_MEDIA,
-            path = path,
-            bytes = fileBytes,
-            mimeType = mimeType,
-            context = context,
-            onProgress = onProgress
-        )
-    }
-
-    /**
      * Deletes a file from Supabase Storage by its public URL.
      */
     suspend fun deleteFileByUrl(publicUrl: String, context: Context? = null): Result<Unit> = withContext(Dispatchers.IO) {
@@ -289,7 +297,7 @@ object SupabaseStorageService {
             val bucket = parts[0]
             val path = parts[1]
 
-            val baseUrl = getSupabaseUrl(context)
+            val baseUrl = getSupabaseUrl(context).removeSuffix("/")
             val anonKey = getSupabaseAnonKey(context)
             if (baseUrl.isBlank() || anonKey.isBlank()) return@withContext Result.success(Unit)
 

@@ -22,25 +22,20 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.CloudDone
-import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -80,12 +75,12 @@ fun SupabaseStorageConfigDialog(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    val currentUrl = remember { SupabaseConfigManager.getProjectUrl(context) }
-    val currentKey = remember { SupabaseConfigManager.getAnonKey(context) }
-    val isInitiallyConfigured = remember { SupabaseConfigManager.isConfigured(context) }
+    val configStatus = remember { SupabaseConfigManager.getConfigStatus(context) }
+    val initialUrl = remember { SupabaseConfigManager.getProjectUrl(context) }
+    val initialKey = remember { SupabaseConfigManager.getAnonKey(context) }
 
-    var projectUrl by remember { mutableStateOf(currentUrl) }
-    var anonKey by remember { mutableStateOf(currentKey) }
+    var projectUrl by remember { mutableStateOf(initialUrl) }
+    var anonKey by remember { mutableStateOf(initialKey) }
     var showKey by remember { mutableStateOf(false) }
 
     var isTesting by remember { mutableStateOf(false) }
@@ -121,7 +116,7 @@ fun SupabaseStorageConfigDialog(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "100% Free Tier ($0 Media CDN)",
+                        text = "Zero-Cost Media Storage (50 MB / file)",
                         color = OnlineGreen,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium
@@ -136,13 +131,13 @@ fun SupabaseStorageConfigDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // Status banner
+                // Status banner with Diagnostics
                 Surface(
-                    color = if (isInitiallyConfigured) OnlineGreen.copy(alpha = 0.12f) else AccentBlue.copy(alpha = 0.12f),
+                    color = if (configStatus.isConfigured) OnlineGreen.copy(alpha = 0.12f) else AccentBlue.copy(alpha = 0.12f),
                     shape = RoundedCornerShape(10.dp),
                     border = androidx.compose.foundation.BorderStroke(
                         1.dp,
-                        if (isInitiallyConfigured) OnlineGreen.copy(alpha = 0.3f) else AccentBlue.copy(alpha = 0.3f)
+                        if (configStatus.isConfigured) OnlineGreen.copy(alpha = 0.3f) else AccentBlue.copy(alpha = 0.3f)
                     ),
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -151,27 +146,83 @@ fun SupabaseStorageConfigDialog(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            imageVector = if (isInitiallyConfigured) Icons.Default.CloudDone else Icons.Default.Info,
+                            imageVector = if (configStatus.isConfigured) Icons.Default.CloudDone else Icons.Default.Info,
                             contentDescription = null,
-                            tint = if (isInitiallyConfigured) OnlineGreen else AccentBlue,
+                            tint = if (configStatus.isConfigured) OnlineGreen else AccentBlue,
                             modifier = Modifier.size(22.dp)
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
                             Text(
-                                text = if (isInitiallyConfigured) "Storage is Configured" else "Configure Storage Connection",
+                                text = if (configStatus.isConfigured) "Storage is Configured" else "Storage Setup Required",
                                 color = TextPrimary,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
-                                text = if (isInitiallyConfigured)
-                                    "Profile photos, posts, and media upload to your free Supabase bucket."
+                                text = if (configStatus.isConfigured)
+                                    "Ready for sending photos, videos, and 24h stories."
                                 else
-                                    "Enter your Supabase Project URL and Anon Key from supabase.com -> Settings -> API.",
+                                    "Configure SUPABASE_URL and SUPABASE_ANON_KEY (or SUPABASE_PUBLISHABLE_KEY) in AI Studio Secrets.",
                                 color = TextSecondary,
                                 fontSize = 11.sp,
                                 lineHeight = 15.sp
+                            )
+                        }
+                    }
+                }
+
+                // Non-sensitive Diagnostic Panel
+                Surface(
+                    color = DarkSurfaceVariant,
+                    shape = RoundedCornerShape(8.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, DarkBorderSubtle),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Text(
+                            text = "Runtime Diagnostics:",
+                            color = TextSecondary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Supabase URL:", color = TextMuted, fontSize = 11.sp)
+                            Text(
+                                text = if (configStatus.hasUrl) "Detected (YES)" else "Missing (NO)",
+                                color = if (configStatus.hasUrl) OnlineGreen else Color(0xFFEF5350),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Public Key:", color = TextMuted, fontSize = 11.sp)
+                            Text(
+                                text = if (configStatus.hasKey) "Detected (${configStatus.keyTypeDisplay})" else "Missing (NO)",
+                                color = if (configStatus.hasKey) OnlineGreen else Color(0xFFEF5350),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Key Format:", color = TextMuted, fontSize = 11.sp)
+                            Text(
+                                text = configStatus.keyMasked,
+                                color = TextSecondary,
+                                fontSize = 10.sp,
+                                fontFamily = FontFamily.Monospace
                             )
                         }
                     }
@@ -227,10 +278,10 @@ fun SupabaseStorageConfigDialog(
                     )
                 }
 
-                // Anon Key Field
+                // Anon / Publishable Key Field
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        text = "Anon / Public Key",
+                        text = "Anon / Publishable Public Key",
                         color = TextSecondary,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium
@@ -246,7 +297,7 @@ fun SupabaseStorageConfigDialog(
                             .testTag("supabase_anon_key_input"),
                         placeholder = {
                             Text(
-                                text = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                                text = "sb_publishable_... or eyJhbGci...",
                                 color = TextMuted,
                                 fontSize = 13.sp
                             )
@@ -323,14 +374,14 @@ fun SupabaseStorageConfigDialog(
                 ) {
                     Column(modifier = Modifier.padding(10.dp)) {
                         Text(
-                            text = "Required Public Buckets (Free Tier):",
+                            text = "Supabase Storage Buckets:",
                             color = TextSecondary,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "• profile-photos (for avatars)\n• posts (for social feed)\n• chat-media (for attachments)",
+                            text = "• chat-media (for photos, videos, files)\n• profile-photos (for avatars)\n• stories (for 24h stories)",
                             color = TextMuted,
                             fontSize = 11.sp,
                             lineHeight = 15.sp,
@@ -344,7 +395,7 @@ fun SupabaseStorageConfigDialog(
                     text = if (isTesting) "Testing Connection..." else "Test Connection",
                     onClick = {
                         if (projectUrl.isBlank() || anonKey.isBlank()) {
-                            testResult = "Please enter both Project URL and Anon Key"
+                            testResult = "Please enter both Project URL and Public Key"
                             testIsSuccess = false
                             return@AppSecondaryButton
                         }
@@ -370,6 +421,24 @@ fun SupabaseStorageConfigDialog(
                     isLoading = isTesting,
                     enabled = !isTesting,
                     testTag = "test_supabase_connection_button"
+                )
+
+                // Revert to Secrets option
+                AppSecondaryButton(
+                    text = "Reset to AI Studio Secrets",
+                    onClick = {
+                        SupabaseConfigManager.clearConfig(context)
+                        projectUrl = SupabaseConfigManager.getProjectUrl(context)
+                        anonKey = SupabaseConfigManager.getAnonKey(context)
+                        testResult = "Reset to environment secrets."
+                        testIsSuccess = true
+                        Toast.makeText(context, "Storage reset to environment secrets", Toast.LENGTH_SHORT).show()
+                        onConfigSaved()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    height = 36.dp,
+                    icon = Icons.Default.RestartAlt,
+                    testTag = "revert_supabase_secrets_button"
                 )
             }
         },
