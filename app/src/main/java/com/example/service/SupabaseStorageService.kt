@@ -121,52 +121,83 @@ object SupabaseStorageService {
 
         val baseUrl = getSupabaseUrl(context).removeSuffix("/")
         val anonKey = getSupabaseAnonKey(context)
-        val cleanPath = path.trimStart('/')
+        val cleanPath = path.trimStart('/').replace("\\s+".toRegex(), "_")
 
         // Endpoint: POST /storage/v1/object/{bucket}/{path}
         val uploadUrl = "$baseUrl/storage/v1/object/$bucket/$cleanPath"
         val publicUrl = getPublicUrl(bucket, cleanPath, context)
 
-        val mediaType = (if (mimeType.isNotBlank()) mimeType else "application/octet-stream").toMediaTypeOrNull()
+        val resolvedMime = when {
+            mimeType.isNotBlank() && mimeType != "*/*" -> mimeType
+            cleanPath.endsWith(".jpg", ignoreCase = true) || cleanPath.endsWith(".jpeg", ignoreCase = true) -> "image/jpeg"
+            cleanPath.endsWith(".png", ignoreCase = true) -> "image/png"
+            cleanPath.endsWith(".webp", ignoreCase = true) -> "image/webp"
+            cleanPath.endsWith(".mp4", ignoreCase = true) -> "video/mp4"
+            cleanPath.endsWith(".mp3", ignoreCase = true) -> "audio/mpeg"
+            cleanPath.endsWith(".pdf", ignoreCase = true) -> "application/pdf"
+            else -> "application/octet-stream"
+        }
+        val mediaType = resolvedMime.toMediaTypeOrNull()
 
         val progressBody = ProgressRequestBody(bytes, mediaType) { progress ->
             onProgress(progress)
         }
 
+        // Use .header() rather than .addHeader() to guarantee no duplicate Content-Type or auth headers
         val request = Request.Builder()
             .url(uploadUrl)
-            .addHeader("apikey", anonKey)
-            .addHeader("Authorization", "Bearer $anonKey")
-            .addHeader("x-upsert", "true")
-            .addHeader("Content-Type", mimeType.ifBlank { "application/octet-stream" })
+            .header("apikey", anonKey)
+            .header("Authorization", "Bearer $anonKey")
+            .header("x-upsert", "true")
+            .header("Content-Type", resolvedMime)
+            .header("cache-control", "3600")
             .post(progressBody)
             .build()
 
-        Log.d(TAG, "Uploading ${bytes.size} bytes to Supabase Storage: $uploadUrl (Content-Type: $mimeType, Key: ${SupabaseConfigManager.maskKey(anonKey)})")
+        Log.d(TAG, "Uploading ${bytes.size} bytes to Supabase Storage: $uploadUrl (Content-Type: $resolvedMime, Key: ${SupabaseConfigManager.maskKey(anonKey)})")
 
         try {
             val response = httpClient.newCall(request).execute()
             val responseBody = response.body?.string().orEmpty()
+            val code = response.code
 
             if (response.isSuccessful) {
-                Log.d(TAG, "Supabase upload succeeded for $bucket/$cleanPath. Public URL: $publicUrl")
+                Log.d(TAG, "Supabase upload succeeded for $bucket/$cleanPath. HTTP $code. Public URL: $publicUrl")
                 onProgress(1f)
                 Result.success(publicUrl)
             } else {
-                val errorMsg = "Supabase Storage upload failed (${response.code}): $responseBody"
-                Log.e(TAG, errorMsg)
+                var errObjName = ""
+                var errMessage = ""
+                try {
+                    val json = org.json.JSONObject(responseBody)
+                    errObjName = json.optString("error", json.optString("error_description", json.optString("statusCode", "")))
+                    errMessage = json.optString("message", json.optString("msg", ""))
+                } catch (_: Exception) {}
 
-                if (response.code == 404 && responseBody.contains("Bucket not found", ignoreCase = true)) {
-                    Result.failure(
-                        IllegalStateException("Supabase bucket '$bucket' was not found. Please create public bucket '$bucket' in your Supabase dashboard.")
-                    )
-                } else if (response.code == 403 || response.code == 401) {
-                    Result.failure(
-                        IllegalStateException("Supabase Storage permission denied (${response.code}). Please ensure bucket '$bucket' is Public and has INSERT/UPDATE policies enabled.")
-                    )
-                } else {
-                    Result.failure(IllegalStateException(errorMsg))
+                if (errMessage.isBlank()) {
+                    errMessage = responseBody.ifBlank { response.message }
                 }
+
+                // Enhanced detailed error logging printing exact Supabase error properties
+                val logDetail = "Supabase Storage Error [HTTP $code]: error='$errObjName', message='$errMessage', bucket='$bucket', path='$cleanPath', rawResponse='$responseBody'"
+                Log.e(TAG, logDetail)
+
+                val detailedExceptionMessage = when {
+                    code == 404 && (responseBody.contains("Bucket not found", ignoreCase = true) || errMessage.contains("Bucket not found", ignoreCase = true)) -> {
+                        "Supabase bucket '$bucket' was not found (HTTP 404). Please create public bucket '$bucket' in your Supabase dashboard."
+                    }
+                    code == 403 || code == 401 -> {
+                        "Supabase Storage permission denied (HTTP $code: $errObjName). Please ensure bucket '$bucket' is Public and has INSERT/UPDATE policies enabled. Details: $errMessage"
+                    }
+                    code == 400 -> {
+                        val reason = if (errObjName.isNotBlank() && errObjName != errMessage) "$errObjName - $errMessage" else errMessage
+                        "Supabase Storage Bad Request (HTTP 400): $reason"
+                    }
+                    else -> {
+                        "Supabase Storage upload failed (HTTP $code): $errMessage"
+                    }
+                }
+                Result.failure(IllegalStateException(detailedExceptionMessage))
             }
         } catch (e: UnknownHostException) {
             val error = "Unable to resolve Supabase hostname for '$baseUrl'. Please check your Supabase Project URL."
@@ -181,7 +212,7 @@ object SupabaseStorageService {
     /**
      * Uploads Chat Media (Image, Video, Audio, Document, Zip):
      * Bucket: "chat-media"
-     * Path: chat-media/{chatId}/{messageId}/{fileName}
+     * Path: chat-media/{chatId}/{messageId}/{cleanFileName}
      */
     suspend fun uploadChatMedia(
         chatId: String,
@@ -192,8 +223,8 @@ object SupabaseStorageService {
         context: Context? = null,
         onProgress: (Float) -> Unit = {}
     ): Result<String> {
-        val sanitized = FileUtils.sanitizeFileName(fileName)
-        val path = "$chatId/$messageId/$sanitized"
+        val cleanFileName = FileUtils.cleanFileNameWithTimestamp(fileName)
+        val path = "$chatId/$messageId/$cleanFileName"
         return uploadFile(
             bucket = BUCKET_CHAT_MEDIA,
             path = path,
@@ -206,8 +237,8 @@ object SupabaseStorageService {
 
     /**
      * Uploads a Profile Photo:
-     * Bucket: "profile-photos"
-     * Path: profile-photos/{userId}/avatar.jpg
+     * Attempts bucket "profile-photos" first; gracefully falls back to "chat-media".
+     * Path: {userId}/{timestamp}-avatar.jpg
      */
     suspend fun uploadProfilePhoto(
         userId: String,
@@ -218,10 +249,26 @@ object SupabaseStorageService {
         val imageBytes = FileUtils.compressImageForUpload(context, imageUri, maxDimension = 1080, quality = 85)
             ?: return Result.failure(IllegalStateException("Unable to read selected photo"))
 
-        val path = "$userId/avatar.jpg"
-        return uploadFile(
+        val cleanFileName = "${System.currentTimeMillis()}-avatar.jpg"
+        val path = "$userId/$cleanFileName"
+
+        val primaryResult = uploadFile(
             bucket = BUCKET_PROFILE_PHOTOS,
             path = path,
+            bytes = imageBytes,
+            mimeType = "image/jpeg",
+            context = context,
+            onProgress = onProgress
+        )
+
+        if (primaryResult.isSuccess) {
+            return primaryResult
+        }
+
+        Log.w(TAG, "Profile photo upload fallback to chat-media: ${primaryResult.exceptionOrNull()?.message}")
+        return uploadFile(
+            bucket = BUCKET_CHAT_MEDIA,
+            path = "avatars/$userId/$cleanFileName",
             bytes = imageBytes,
             mimeType = "image/jpeg",
             context = context,
@@ -231,8 +278,8 @@ object SupabaseStorageService {
 
     /**
      * Uploads Story Media (Photo or Video) for the 24-Hour Story system:
-     * Attempts bucket "stories" first; gracefully falls back to "chat-media" if "stories" bucket doesn't exist.
-     * Path: stories/{userId}/{storyId}/story.{ext}
+     * Attempts bucket "stories" first; gracefully falls back to "chat-media" if "stories" bucket doesn't exist or errors.
+     * Path: {userId}/{storyId}/{timestamp}-story.{ext}
      */
     suspend fun uploadStoryMedia(
         userId: String,
@@ -244,7 +291,8 @@ object SupabaseStorageService {
     ): Result<StoryMediaUploadResult> {
         val extension = if (isVideo) "mp4" else "jpg"
         val mimeType = if (isVideo) "video/mp4" else "image/jpeg"
-        val path = "stories/$userId/$storyId/story.$extension"
+        val cleanFileName = "${System.currentTimeMillis()}-story.$extension"
+        val path = "$userId/$storyId/$cleanFileName"
 
         val bytes = if (isVideo) {
             FileUtils.readBytesFromUri(context, uri)
@@ -273,11 +321,12 @@ object SupabaseStorageService {
             return Result.success(StoryMediaUploadResult(url, path, BUCKET_STORIES))
         }
 
-        // If bucket not found or forbidden, fallback to existing BUCKET_CHAT_MEDIA
-        Log.w(TAG, "Stories bucket upload fallback to chat-media: ${primaryResult.exceptionOrNull()?.message}")
+        // If bucket not found or 400/403, fallback to existing BUCKET_CHAT_MEDIA
+        val fallbackPath = "stories/$userId/$storyId/$cleanFileName"
+        Log.w(TAG, "Stories bucket upload fallback to chat-media ($fallbackPath): ${primaryResult.exceptionOrNull()?.message}")
         val fallbackResult = uploadFile(
             bucket = BUCKET_CHAT_MEDIA,
-            path = path,
+            path = fallbackPath,
             bytes = bytes,
             mimeType = mimeType,
             context = context,
@@ -285,14 +334,14 @@ object SupabaseStorageService {
         )
 
         return fallbackResult.map { url ->
-            StoryMediaUploadResult(url, path, BUCKET_CHAT_MEDIA)
+            StoryMediaUploadResult(url, fallbackPath, BUCKET_CHAT_MEDIA)
         }
     }
 
     /**
      * Uploads Post Media (Photo or Video) for the Feed Post system:
-     * Attempts bucket "posts" first; gracefully falls back to "chat-media" if "posts" bucket doesn't exist.
-     * Path: posts/{userId}/{postId}/post.{ext}
+     * Attempts bucket "posts" first; gracefully falls back to "chat-media" if "posts" bucket doesn't exist or errors.
+     * Path: {userId}/{postId}/{timestamp}-post.{ext}
      */
     suspend fun uploadPostMedia(
         userId: String,
@@ -304,7 +353,8 @@ object SupabaseStorageService {
     ): Result<PostMediaUploadResult> {
         val extension = if (isVideo) "mp4" else "jpg"
         val mimeType = if (isVideo) "video/mp4" else "image/jpeg"
-        val path = "posts/$userId/$postId/post.$extension"
+        val cleanFileName = "${System.currentTimeMillis()}-post.$extension"
+        val path = "$userId/$postId/$cleanFileName"
 
         val bytes = if (isVideo) {
             FileUtils.readBytesFromUri(context, uri)
@@ -333,11 +383,12 @@ object SupabaseStorageService {
             return Result.success(PostMediaUploadResult(url, path, BUCKET_POSTS))
         }
 
-        // If bucket not found or forbidden, fallback to existing BUCKET_CHAT_MEDIA
-        Log.w(TAG, "Posts bucket upload fallback to chat-media: ${primaryResult.exceptionOrNull()?.message}")
+        // If bucket not found or 400/403, fallback to existing BUCKET_CHAT_MEDIA
+        val fallbackPath = "posts/$userId/$postId/$cleanFileName"
+        Log.w(TAG, "Posts bucket upload fallback to chat-media ($fallbackPath): ${primaryResult.exceptionOrNull()?.message}")
         val fallbackResult = uploadFile(
             bucket = BUCKET_CHAT_MEDIA,
-            path = path,
+            path = fallbackPath,
             bytes = bytes,
             mimeType = mimeType,
             context = context,
@@ -345,7 +396,7 @@ object SupabaseStorageService {
         )
 
         return fallbackResult.map { url ->
-            PostMediaUploadResult(url, path, BUCKET_CHAT_MEDIA)
+            PostMediaUploadResult(url, fallbackPath, BUCKET_CHAT_MEDIA)
         }
     }
 

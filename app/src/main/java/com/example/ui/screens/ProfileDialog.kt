@@ -92,7 +92,6 @@ fun ProfileDialog(
     var isCheckingUsername by remember { mutableStateOf(false) }
     var usernameAvailable by remember { mutableStateOf<Boolean?>(null) }
     var usernameValidationError by remember { mutableStateOf<String?>(null) }
-    var showStorageConfigDialog by remember { mutableStateOf(false) }
 
     val hasExistingUsername = user.username.isNotBlank()
 
@@ -324,16 +323,6 @@ fun ProfileDialog(
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Storage settings shortcut
-                AppSecondaryButton(
-                    text = "Media Storage Settings (Free Tier)",
-                    onClick = { showStorageConfigDialog = true },
-                    modifier = Modifier.fillMaxWidth(),
-                    height = 42.dp,
-                    testTag = "profile_storage_settings_button"
-                )
             }
         },
         confirmButton = {
@@ -376,10 +365,4 @@ fun ProfileDialog(
             }
         }
     )
-
-    if (showStorageConfigDialog) {
-        com.example.ui.components.SupabaseStorageConfigDialog(
-            onDismiss = { showStorageConfigDialog = false }
-        )
-    }
 }

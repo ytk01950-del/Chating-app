@@ -116,7 +116,14 @@ object FileUtils {
     }
 
     fun sanitizeFileName(raw: String): String {
-        return raw.replace("[^a-zA-Z0-9._-]".toRegex(), "_").take(100)
+        val noSpaces = raw.trim().replace("\\s+".toRegex(), "_")
+        val cleaned = noSpaces.replace("[^a-zA-Z0-9._-]".toRegex(), "_").take(100)
+        return if (cleaned.isBlank()) "file_${System.currentTimeMillis()}" else cleaned
+    }
+
+    fun cleanFileNameWithTimestamp(rawName: String): String {
+        val sanitized = sanitizeFileName(rawName)
+        return "${System.currentTimeMillis()}-$sanitized"
     }
 
     fun formatFileSize(bytes: Long): String {

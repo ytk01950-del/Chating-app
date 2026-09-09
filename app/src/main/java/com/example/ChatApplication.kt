@@ -36,10 +36,11 @@ class ChatApplication : Application() {
             // Create Android notification channel for chat messages
             com.example.util.WpChatNotificationHelper.createNotificationChannel(this)
 
-            // Supabase Storage runtime diagnostic check
+            // Supabase client auto-initialization on app launch with built-in credentials
+            com.example.service.SupabaseConfig.initialize(this)
             val supabaseStatus = com.example.service.SupabaseConfigManager.getConfigStatus(this)
             Log.i("ChatApplication", "=== Supabase Storage Runtime Diagnostics ===")
-            Log.i("ChatApplication", "SUPABASE_URL detected = ${supabaseStatus.urlDetected}")
+            Log.i("ChatApplication", "SUPABASE_URL detected = ${supabaseStatus.urlDetected} (${supabaseStatus.urlDisplay})")
             Log.i("ChatApplication", "SUPABASE_PUBLIC_KEY detected = ${supabaseStatus.publicKeyDetected}")
             Log.i("ChatApplication", "=============================================")
         } catch (e: Exception) {

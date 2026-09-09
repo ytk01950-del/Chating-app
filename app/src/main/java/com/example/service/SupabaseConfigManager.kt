@@ -141,16 +141,8 @@ object SupabaseConfigManager {
         } catch (ignored: Throwable) {
         }
 
-        // 3. Check Secrets Gradle Plugin (BuildConfig.SUPABASE_URL)
-        try {
-            val buildConfigUrl = BuildConfig.SUPABASE_URL.trim().removeSuffix("/")
-            if (buildConfigUrl.isNotBlank() && !isPlaceholderUrl(buildConfigUrl)) {
-                return formatUrl(buildConfigUrl)
-            }
-        } catch (ignored: Throwable) {
-        }
-
-        return ""
+        // 4. Default built-in Supabase Project URL
+        return SupabaseConfig.DEFAULT_SUPABASE_URL
     }
 
     /**
@@ -195,7 +187,8 @@ object SupabaseConfigManager {
             }
         }
 
-        return ""
+        // 3. Default built-in Supabase Public Anon Key
+        return SupabaseConfig.DEFAULT_SUPABASE_ANON_KEY
     }
 
     /**

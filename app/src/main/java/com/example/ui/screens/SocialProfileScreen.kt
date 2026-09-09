@@ -140,7 +140,6 @@ fun SocialProfileScreen(
 
     var showEditProfileDialog by remember { mutableStateOf(false) }
     var showCreateStoryDialog by remember { mutableStateOf(false) }
-    var showStorageConfigDialog by remember { mutableStateOf(false) }
     var showStoryViewer by remember { mutableStateOf(false) }
     var initialStoryIndex by remember { mutableIntStateOf(0) }
 
@@ -241,15 +240,6 @@ fun SocialProfileScreen(
                             size = 38.dp,
                             iconSize = 22.dp,
                             testTag = "header_add_story_button"
-                        )
-                        AppIconButton(
-                            icon = Icons.Default.Cloud,
-                            contentDescription = "Storage Settings",
-                            onClick = { showStorageConfigDialog = true },
-                            tint = AccentBlue,
-                            size = 38.dp,
-                            iconSize = 20.dp,
-                            testTag = "header_storage_config_button"
                         )
                         AppIconButton(
                             icon = Icons.Default.Edit,
@@ -787,13 +777,6 @@ fun SocialProfileScreen(
             },
             onClaimUsername = onClaimUsername,
             onCheckUsernameAvailable = onCheckUsernameAvailable
-        )
-    }
-
-    // Storage Config Dialog
-    if (showStorageConfigDialog) {
-        com.example.ui.components.SupabaseStorageConfigDialog(
-            onDismiss = { showStorageConfigDialog = false }
         )
     }
 }

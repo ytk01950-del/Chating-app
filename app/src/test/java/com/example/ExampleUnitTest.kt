@@ -1,5 +1,6 @@
 package com.example
 
+import com.example.service.SupabaseConfig
 import com.example.service.SupabaseConfigManager
 import com.example.service.SupabaseStorageService
 import org.junit.Assert.*
@@ -44,6 +45,14 @@ class ExampleUnitTest {
 
         val maskedPub = SupabaseConfigManager.maskKey("sb_publishable_abcdef1234567890")
         assertTrue(maskedPub.startsWith("sb_pub..."))
+    }
+
+    @Test
+    fun testSupabaseConfig_defaults() {
+        assertFalse(SupabaseConfig.DEFAULT_SUPABASE_URL.isBlank())
+        assertFalse(SupabaseConfig.DEFAULT_SUPABASE_ANON_KEY.isBlank())
+        assertTrue(SupabaseConfig.getProjectUrl().startsWith("https://"))
+        assertTrue(SupabaseConfig.getAnonKey().length > 20)
     }
 
     @Test
