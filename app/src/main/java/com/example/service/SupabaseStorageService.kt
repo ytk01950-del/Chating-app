@@ -34,8 +34,15 @@ object SupabaseStorageService {
     const val BUCKET_CHAT_MEDIA = "chat-media"
     const val BUCKET_PROFILE_PHOTOS = "profile-photos"
     const val BUCKET_STORIES = "stories"
+    const val BUCKET_POSTS = "posts"
 
     data class StoryMediaUploadResult(
+        val publicUrl: String,
+        val storagePath: String,
+        val bucket: String
+    )
+
+    data class PostMediaUploadResult(
         val publicUrl: String,
         val storagePath: String,
         val bucket: String
@@ -279,6 +286,66 @@ object SupabaseStorageService {
 
         return fallbackResult.map { url ->
             StoryMediaUploadResult(url, path, BUCKET_CHAT_MEDIA)
+        }
+    }
+
+    /**
+     * Uploads Post Media (Photo or Video) for the Feed Post system:
+     * Attempts bucket "posts" first; gracefully falls back to "chat-media" if "posts" bucket doesn't exist.
+     * Path: posts/{userId}/{postId}/post.{ext}
+     */
+    suspend fun uploadPostMedia(
+        userId: String,
+        postId: String,
+        uri: Uri,
+        isVideo: Boolean,
+        context: Context,
+        onProgress: (Float) -> Unit = {}
+    ): Result<PostMediaUploadResult> {
+        val extension = if (isVideo) "mp4" else "jpg"
+        val mimeType = if (isVideo) "video/mp4" else "image/jpeg"
+        val path = "posts/$userId/$postId/post.$extension"
+
+        val bytes = if (isVideo) {
+            FileUtils.readBytesFromUri(context, uri)
+                ?: return Result.failure(IllegalStateException("Unable to read selected video file"))
+        } else {
+            FileUtils.compressImageForUpload(context, uri, maxDimension = 1920, quality = 88)
+                ?: return Result.failure(IllegalStateException("Unable to process selected photo"))
+        }
+
+        if (bytes.size > MAX_FILE_SIZE_BYTES) {
+            return Result.failure(IllegalStateException("Post media exceeds 50MB limit (${FileUtils.formatFileSize(bytes.size.toLong())})"))
+        }
+
+        // Try primary bucket BUCKET_POSTS
+        val primaryResult = uploadFile(
+            bucket = BUCKET_POSTS,
+            path = path,
+            bytes = bytes,
+            mimeType = mimeType,
+            context = context,
+            onProgress = onProgress
+        )
+
+        if (primaryResult.isSuccess) {
+            val url = primaryResult.getOrThrow()
+            return Result.success(PostMediaUploadResult(url, path, BUCKET_POSTS))
+        }
+
+        // If bucket not found or forbidden, fallback to existing BUCKET_CHAT_MEDIA
+        Log.w(TAG, "Posts bucket upload fallback to chat-media: ${primaryResult.exceptionOrNull()?.message}")
+        val fallbackResult = uploadFile(
+            bucket = BUCKET_CHAT_MEDIA,
+            path = path,
+            bytes = bytes,
+            mimeType = mimeType,
+            context = context,
+            onProgress = onProgress
+        )
+
+        return fallbackResult.map { url ->
+            PostMediaUploadResult(url, path, BUCKET_CHAT_MEDIA)
         }
     }
 

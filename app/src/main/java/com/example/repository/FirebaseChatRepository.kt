@@ -4,9 +4,12 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import com.example.model.ChatMessage
+import com.example.model.MessageRequest
 import com.example.model.MessageType
+import com.example.model.Post
 import com.example.model.Story
 import com.example.model.User
+import com.example.model.UserReport
 import com.example.service.SupabaseStorageService
 import com.example.util.FileUtils
 import com.google.firebase.FirebaseApp
@@ -558,6 +561,32 @@ class FirebaseChatRepository {
         return observeRecentConversations(currentUserId)
     }
 
+    fun observeOnlineUsers(currentUserId: String): Flow<List<User>> = callbackFlow {
+        val usersRef = database.getReference("users")
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val now = System.currentTimeMillis()
+                val onlineList = mutableListOf<User>()
+                for (child in snapshot.children) {
+                    val user = child.getValue(User::class.java)
+                    if (user != null && user.id.isNotBlank() && user.id != currentUserId) {
+                        val isRecentlyActive = user.isOnline || (now - user.lastSeen < 2 * 60 * 1000L)
+                        if (isRecentlyActive) {
+                            onlineList.add(sanitizePublicUser(user.copy(isOnline = true)))
+                        }
+                    }
+                }
+                trySend(onlineList.sortedByDescending { it.lastSeen })
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                trySend(emptyList())
+            }
+        }
+        usersRef.addValueEventListener(listener)
+        awaitClose { usersRef.removeEventListener(listener) }
+    }
+
     // -------------------------------------------------------------
     // REAL-TIME INCOMING NOTIFICATIONS OBSERVER
     // -------------------------------------------------------------
@@ -638,7 +667,8 @@ class FirebaseChatRepository {
                 receiverId = receiverId,
                 text = text.trim(),
                 timestamp = System.currentTimeMillis(),
-                isRead = false
+                isRead = false,
+                status = "sent"
             )
 
             // 1. Write the message into Realtime Database
@@ -659,6 +689,22 @@ class FirebaseChatRepository {
             )
             database.getReference("user_chats").child(receiverId).child(chatId).setValue(receiverSnippet)
 
+            // Check if conversation status is accepted or create message request
+            val convStatusSnap = database.getReference("conversation_status").child(chatId).get().await()
+            val convStatus = convStatusSnap.getValue(String::class.java)
+            if (convStatus != "accepted") {
+                val request = MessageRequest(
+                    requestId = sender.id,
+                    fromUserId = sender.id,
+                    toUserId = receiverId,
+                    fromUser = sender,
+                    initialMessage = text.trim(),
+                    createdAt = System.currentTimeMillis(),
+                    status = "pending"
+                )
+                database.getReference("message_requests").child(receiverId).child(sender.id).setValue(request)
+            }
+
             // 3. Post notification payload for recipient
             val notifPayload = mapOf(
                 "messageId" to msgId,
@@ -677,6 +723,222 @@ class FirebaseChatRepository {
             Result.success(message)
         } catch (e: Exception) {
             Log.e(tag, "Firebase send message failed: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun markMessagesAsDelivered(chatId: String, currentUserId: String) {
+        try {
+            val messagesRef = database.getReference("chats").child(chatId).child("messages")
+            val snapshot = messagesRef.get().await()
+            val updates = mutableMapOf<String, Any>()
+            val now = System.currentTimeMillis()
+            for (child in snapshot.children) {
+                val receiverId = child.child("receiverId").getValue(String::class.java)
+                val status = child.child("status").getValue(String::class.java) ?: "sent"
+                if (receiverId == currentUserId && status == "sent") {
+                    val msgKey = child.key ?: continue
+                    updates["$msgKey/status"] = "delivered"
+                    updates["$msgKey/deliveredAt"] = now
+                }
+            }
+            if (updates.isNotEmpty()) {
+                messagesRef.updateChildren(updates).await()
+            }
+        } catch (e: Exception) {
+            Log.w(tag, "markMessagesAsDelivered note: ${e.message}")
+        }
+    }
+
+    suspend fun markMessagesAsRead(chatId: String, currentUserId: String) {
+        try {
+            val messagesRef = database.getReference("chats").child(chatId).child("messages")
+            val snapshot = messagesRef.get().await()
+            val updates = mutableMapOf<String, Any>()
+            val now = System.currentTimeMillis()
+            for (child in snapshot.children) {
+                val receiverId = child.child("receiverId").getValue(String::class.java)
+                val isRead = child.child("isRead").getValue(Boolean::class.java) ?: false
+                val status = child.child("status").getValue(String::class.java) ?: "sent"
+                if (receiverId == currentUserId && (!isRead || status != "seen")) {
+                    val msgKey = child.key ?: continue
+                    updates["$msgKey/isRead"] = true
+                    updates["$msgKey/status"] = "seen"
+                    updates["$msgKey/seenAt"] = now
+                }
+            }
+            if (updates.isNotEmpty()) {
+                messagesRef.updateChildren(updates).await()
+            }
+        } catch (e: Exception) {
+            Log.w(tag, "markMessagesAsRead note: ${e.message}")
+        }
+    }
+
+    suspend fun markTemporaryMediaViewed(chatId: String, messageId: String) {
+        try {
+            val msgRef = database.getReference("chats").child(chatId).child("messages").child(messageId)
+            val snap = msgRef.get().await()
+            val viewedAt = snap.child("viewedAt").getValue(Long::class.java) ?: 0L
+            if (viewedAt == 0L) {
+                val now = System.currentTimeMillis()
+                val expiresAt = now + 60_000L // 1 minute countdown
+                val updates = mapOf<String, Any>(
+                    "viewedAt" to now,
+                    "expiresAt" to expiresAt
+                )
+                msgRef.updateChildren(updates).await()
+            }
+        } catch (e: Exception) {
+            Log.w(tag, "markTemporaryMediaViewed error: ${e.message}")
+        }
+    }
+
+    suspend fun markMediaExpired(chatId: String, messageId: String) {
+        try {
+            database.getReference("chats")
+                .child(chatId)
+                .child("messages")
+                .child(messageId)
+                .child("isExpired")
+                .setValue(true)
+                .await()
+        } catch (e: Exception) {
+            Log.w(tag, "markMediaExpired error: ${e.message}")
+        }
+    }
+
+    // -------------------------------------------------------------
+    // MESSAGE REQUESTS (ACCEPT / DECLINE / BLOCK)
+    // -------------------------------------------------------------
+
+    fun observeMessageRequests(userId: String): Flow<List<MessageRequest>> = callbackFlow {
+        if (userId.isBlank()) {
+            trySend(emptyList())
+            close()
+            return@callbackFlow
+        }
+        val ref = database.getReference("message_requests").child(userId)
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val list = mutableListOf<MessageRequest>()
+                for (child in snapshot.children) {
+                    val req = child.getValue(MessageRequest::class.java)
+                    if (req != null && req.status == "pending") {
+                        list.add(req)
+                    }
+                }
+                list.sortByDescending { it.createdAt }
+                trySend(list)
+            }
+            override fun onCancelled(error: DatabaseError) {
+                trySend(emptyList())
+            }
+        }
+        ref.addValueEventListener(listener)
+        awaitClose { ref.removeEventListener(listener) }
+    }
+
+    suspend fun acceptMessageRequest(currentUserId: String, fromUserId: String, requestId: String) {
+        try {
+            val chatId = getChatId(currentUserId, fromUserId)
+            database.getReference("conversation_status").child(chatId).setValue("accepted").await()
+            database.getReference("message_requests").child(currentUserId).child(requestId).removeValue().await()
+        } catch (e: Exception) {
+            Log.e(tag, "acceptMessageRequest error: ${e.message}")
+        }
+    }
+
+    suspend fun declineMessageRequest(currentUserId: String, requestId: String) {
+        try {
+            database.getReference("message_requests").child(currentUserId).child(requestId).removeValue().await()
+        } catch (e: Exception) {
+            Log.e(tag, "declineMessageRequest error: ${e.message}")
+        }
+    }
+
+    // -------------------------------------------------------------
+    // USER BLOCKING & MODERATION
+    // -------------------------------------------------------------
+
+    fun observeBlockedUsers(currentUserId: String): Flow<Set<String>> = callbackFlow {
+        if (currentUserId.isBlank()) {
+            trySend(emptySet())
+            close()
+            return@callbackFlow
+        }
+        val ref = database.getReference("user_blocks").child(currentUserId)
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val blocked = mutableSetOf<String>()
+                for (child in snapshot.children) {
+                    if (child.getValue(Boolean::class.java) == true || child.value != null) {
+                        blocked.add(child.key.orEmpty())
+                    }
+                }
+                trySend(blocked)
+            }
+            override fun onCancelled(error: DatabaseError) {
+                trySend(emptySet())
+            }
+        }
+        ref.addValueEventListener(listener)
+        awaitClose { ref.removeEventListener(listener) }
+    }
+
+    suspend fun blockUser(currentUserId: String, targetUserId: String) {
+        try {
+            database.getReference("user_blocks").child(currentUserId).child(targetUserId).setValue(true).await()
+            database.getReference("message_requests").child(currentUserId).child(targetUserId).removeValue().await()
+        } catch (e: Exception) {
+            Log.e(tag, "blockUser error: ${e.message}")
+        }
+    }
+
+    suspend fun unblockUser(currentUserId: String, targetUserId: String) {
+        try {
+            database.getReference("user_blocks").child(currentUserId).child(targetUserId).removeValue().await()
+        } catch (e: Exception) {
+            Log.e(tag, "unblockUser error: ${e.message}")
+        }
+    }
+
+    suspend fun submitReport(report: UserReport): Result<Unit> {
+        return try {
+            val reportId = report.reportId.ifBlank { "report_${System.currentTimeMillis()}" }
+            database.getReference("reports").child(reportId).setValue(report.copy(reportId = reportId)).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(tag, "submitReport error: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
+    // -------------------------------------------------------------
+    // ACCOUNT DELETION
+    // -------------------------------------------------------------
+
+    suspend fun deleteAccount(userId: String, username: String): Result<Unit> {
+        return try {
+            if (userId.isNotBlank()) {
+                val usernameKey = username.trim().lowercase().replace(".", "_")
+                database.getReference("users").child(userId).removeValue().await()
+                if (usernameKey.isNotBlank()) {
+                    database.getReference("usernames").child(usernameKey).removeValue().await()
+                }
+                database.getReference("user_chats").child(userId).removeValue().await()
+                database.getReference("user_stories").child(userId).removeValue().await()
+                database.getReference("user_posts").child(userId).removeValue().await()
+                database.getReference("user_blocks").child(userId).removeValue().await()
+                database.getReference("message_requests").child(userId).removeValue().await()
+                database.getReference("fcm_tokens").child(userId).removeValue().await()
+            }
+            auth.currentUser?.delete()?.await()
+            auth.signOut()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(tag, "deleteAccount error: ${e.message}")
+            try { auth.signOut() } catch (_: Exception) {}
             Result.failure(e)
         }
     }
@@ -1057,6 +1319,7 @@ class FirebaseChatRepository {
                 onSuccess = { downloadUrl ->
                     Log.d(tag, "Chat media uploaded to Supabase. Download URL: $downloadUrl")
 
+                    val isTempMedia = (meta.messageType == MessageType.IMAGE || meta.messageType == MessageType.VIDEO)
                     val message = ChatMessage(
                         id = msgId,
                         senderId = sender.id,
@@ -1065,11 +1328,13 @@ class FirebaseChatRepository {
                         text = caption.trim(),
                         timestamp = System.currentTimeMillis(),
                         isRead = false,
+                        status = "sent",
                         messageType = meta.messageType.name,
                         fileName = meta.name,
                         fileUrl = downloadUrl,
                         mimeType = meta.mimeType,
-                        fileSize = fileBytes.size.toLong()
+                        fileSize = fileBytes.size.toLong(),
+                        isTemporary = isTempMedia
                     )
 
                     // 1. Write message to Firebase database
@@ -1090,6 +1355,22 @@ class FirebaseChatRepository {
                         "lastTimestamp" to message.timestamp
                     )
                     database.getReference("user_chats").child(receiverId).child(chatId).setValue(receiverSnippet)
+
+                    // Check conversation status for message request
+                    val convStatusSnap = database.getReference("conversation_status").child(chatId).get().await()
+                    val convStatus = convStatusSnap.getValue(String::class.java)
+                    if (convStatus != "accepted") {
+                        val request = MessageRequest(
+                            requestId = sender.id,
+                            fromUserId = sender.id,
+                            toUserId = receiverId,
+                            fromUser = sender,
+                            initialMessage = summaryText,
+                            createdAt = System.currentTimeMillis(),
+                            status = "pending"
+                        )
+                        database.getReference("message_requests").child(receiverId).child(sender.id).setValue(request)
+                    }
 
                     // 3. Post notification payload
                     val notifPayload = mapOf(
@@ -1116,6 +1397,118 @@ class FirebaseChatRepository {
             )
         } catch (e: Exception) {
             Log.e(tag, "Exception in uploadAndSendMediaMessage: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    // -------------------------------------------------------------
+    // FEED POSTS SYSTEM
+    // -------------------------------------------------------------
+
+    suspend fun createPost(
+        userId: String,
+        user: User,
+        mediaUri: Uri,
+        isVideo: Boolean,
+        caption: String,
+        context: Context,
+        onProgress: (Float) -> Unit = {}
+    ): Result<Post> {
+        return try {
+            val postId = "post_${System.currentTimeMillis()}_${(1000..9999).random()}"
+            val uploadRes = SupabaseStorageService.uploadPostMedia(
+                userId = userId,
+                postId = postId,
+                uri = mediaUri,
+                isVideo = isVideo,
+                context = context,
+                onProgress = onProgress
+            )
+
+            uploadRes.fold(
+                onSuccess = { res ->
+                    val post = Post(
+                        id = postId,
+                        userId = userId,
+                        userDisplayName = user.displayName.ifBlank { user.username },
+                        userUsername = user.username,
+                        userPhotoUrl = user.photoUrl,
+                        mediaUrl = res.publicUrl,
+                        storagePath = res.storagePath,
+                        mediaType = if (isVideo) "video" else "image",
+                        caption = caption.trim(),
+                        createdAt = System.currentTimeMillis(),
+                        likesCount = 0,
+                        likes = emptyMap()
+                    )
+
+                    database.getReference("posts").child(postId).setValue(post).await()
+                    database.getReference("user_posts").child(userId).child(postId).setValue(post).await()
+                    onProgress(1f)
+                    Result.success(post)
+                },
+                onFailure = { err ->
+                    Result.failure(err)
+                }
+            )
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    fun observeFeedPosts(): Flow<List<Post>> = callbackFlow {
+        val postsRef = database.getReference("posts")
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val list = mutableListOf<Post>()
+                for (child in snapshot.children) {
+                    val post = child.getValue(Post::class.java)
+                    if (post != null) {
+                        list.add(post)
+                    }
+                }
+                list.sortByDescending { it.createdAt }
+                trySend(list)
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                trySend(emptyList())
+            }
+        }
+        postsRef.addValueEventListener(listener)
+        awaitClose { postsRef.removeEventListener(listener) }
+    }
+
+    suspend fun toggleLikePost(postId: String, userId: String) {
+        try {
+            val postRef = database.getReference("posts").child(postId)
+            val snap = postRef.get().await()
+            val post = snap.getValue(Post::class.java) ?: return
+            val currentlyLiked = post.likes[userId] == true
+            val newLiked = !currentlyLiked
+            val newCount = if (newLiked) post.likesCount + 1 else (post.likesCount - 1).coerceAtLeast(0)
+            val updates = mapOf<String, Any>(
+                "likes/$userId" to newLiked,
+                "likesCount" to newCount
+            )
+            postRef.updateChildren(updates).await()
+            if (post.userId.isNotBlank()) {
+                database.getReference("user_posts").child(post.userId).child(postId).updateChildren(updates).await()
+            }
+        } catch (e: Exception) {
+            Log.w(tag, "toggleLikePost error: ${e.message}")
+        }
+    }
+
+    suspend fun deletePost(userId: String, postId: String, mediaUrl: String): Result<Unit> {
+        return try {
+            database.getReference("posts").child(postId).removeValue().await()
+            database.getReference("user_posts").child(userId).child(postId).removeValue().await()
+            if (mediaUrl.isNotBlank()) {
+                SupabaseStorageService.deleteFileByUrl(mediaUrl)
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
             Result.failure(e)
         }
     }

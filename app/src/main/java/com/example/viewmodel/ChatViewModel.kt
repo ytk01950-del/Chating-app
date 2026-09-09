@@ -5,9 +5,12 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.model.ChatMessage
+import com.example.model.MessageRequest
 import com.example.model.MessageType
+import com.example.model.Post
 import com.example.model.Story
 import com.example.model.User
+import com.example.model.UserReport
 import com.example.model.UserStoryGroup
 import com.example.repository.FirebaseChatRepository
 import com.example.util.FileUtils
@@ -87,6 +90,27 @@ class ChatViewModel(
     val activeStoryViewer: StateFlow<Pair<User, List<Story>>?> = _activeStoryViewer.asStateFlow()
 
     // -------------------------------------------------------------
+    // ONLINE USERS, FEED POSTS, REQUESTS & BLOCKS STATE
+    // -------------------------------------------------------------
+    private val _onlineUsers = MutableStateFlow<List<User>>(emptyList())
+    val onlineUsers: StateFlow<List<User>> = _onlineUsers.asStateFlow()
+
+    private val _feedPosts = MutableStateFlow<List<Post>>(emptyList())
+    val feedPosts: StateFlow<List<Post>> = _feedPosts.asStateFlow()
+
+    private val _messageRequests = MutableStateFlow<List<MessageRequest>>(emptyList())
+    val messageRequests: StateFlow<List<MessageRequest>> = _messageRequests.asStateFlow()
+
+    private val _blockedUserIds = MutableStateFlow<Set<String>>(emptySet())
+    val blockedUserIds: StateFlow<Set<String>> = _blockedUserIds.asStateFlow()
+
+    private val _isUploadingPost = MutableStateFlow(false)
+    val isUploadingPost: StateFlow<Boolean> = _isUploadingPost.asStateFlow()
+
+    private val _postUploadProgress = MutableStateFlow(0f)
+    val postUploadProgress: StateFlow<Float> = _postUploadProgress.asStateFlow()
+
+    // -------------------------------------------------------------
     // CHAT MEDIA UPLOADS STATE
     // -------------------------------------------------------------
     private val _isUploadingMedia = MutableStateFlow(false)
@@ -101,7 +125,11 @@ class ChatViewModel(
     private var messagesJob: Job? = null
     private var typingJob: Job? = null
     private var usersJob: Job? = null
+    private var onlineUsersJob: Job? = null
     private var activeStoriesJob: Job? = null
+    private var feedPostsJob: Job? = null
+    private var messageRequestsJob: Job? = null
+    private var blockedUsersJob: Job? = null
     private var profileStoriesJob: Job? = null
     private var typingDebounceJob: Job? = null
 
@@ -356,12 +384,20 @@ class ChatViewModel(
             _selectedProfileUser.value = null
             _userStories.value = emptyList()
             _activeStories.value = emptyList()
+            _onlineUsers.value = emptyList()
+            _feedPosts.value = emptyList()
+            _messageRequests.value = emptyList()
+            _blockedUserIds.value = emptySet()
             _activeStoryViewer.value = null
             _authUiState.value = AuthUiState.Idle
             usersJob?.cancel()
+            onlineUsersJob?.cancel()
             messagesJob?.cancel()
             typingJob?.cancel()
             activeStoriesJob?.cancel()
+            feedPostsJob?.cancel()
+            messageRequestsJob?.cancel()
+            blockedUsersJob?.cancel()
             profileStoriesJob?.cancel()
         }
     }
@@ -372,6 +408,38 @@ class ChatViewModel(
             repository.syncFcmToken(currentUserId)
             repository.observeRecentConversations(currentUserId).collect { userList ->
                 _allUsers.value = userList
+            }
+        }
+
+        // Real-time online users observer
+        onlineUsersJob?.cancel()
+        onlineUsersJob = viewModelScope.launch {
+            repository.observeOnlineUsers(currentUserId).collect { onlineList ->
+                _onlineUsers.value = onlineList
+            }
+        }
+
+        // Real-time feed posts observer
+        feedPostsJob?.cancel()
+        feedPostsJob = viewModelScope.launch {
+            repository.observeFeedPosts().collect { posts ->
+                _feedPosts.value = posts
+            }
+        }
+
+        // Real-time message requests observer
+        messageRequestsJob?.cancel()
+        messageRequestsJob = viewModelScope.launch {
+            repository.observeMessageRequests(currentUserId).collect { reqs ->
+                _messageRequests.value = reqs
+            }
+        }
+
+        // Real-time blocked users observer
+        blockedUsersJob?.cancel()
+        blockedUsersJob = viewModelScope.launch {
+            repository.observeBlockedUsers(currentUserId).collect { blocked ->
+                _blockedUserIds.value = blocked
             }
         }
 
@@ -431,11 +499,21 @@ class ChatViewModel(
         _selectedProfileUser.value = null
         val chatId = repository.getChatId(user.id, otherUser.id)
 
+        // Mark incoming messages as read & delivered
+        viewModelScope.launch {
+            repository.markMessagesAsDelivered(chatId, user.id)
+            repository.markMessagesAsRead(chatId, user.id)
+        }
+
         // Observe messages
         messagesJob?.cancel()
         messagesJob = viewModelScope.launch {
             repository.observeMessages(chatId).collect { msgList ->
                 _activeMessages.value = msgList
+                // Check if any incoming unread messages need reading
+                if (msgList.any { it.receiverId == user.id && (!it.isRead || it.status != "seen") }) {
+                    repository.markMessagesAsRead(chatId, user.id)
+                }
             }
         }
 
@@ -705,6 +783,179 @@ class ChatViewModel(
         viewModelScope.launch {
             repository.saveUserProfile(updated)
             _infoMessage.value = "Profile updated successfully"
+        }
+    }
+
+    // -------------------------------------------------------------
+    // FEED POSTS OPERATIONS
+    // -------------------------------------------------------------
+
+    fun createPost(
+        mediaUri: Uri,
+        isVideo: Boolean,
+        caption: String,
+        context: Context,
+        onComplete: () -> Unit = {}
+    ) {
+        val current = _currentUser.value ?: return
+        _isUploadingPost.value = true
+        _postUploadProgress.value = 0f
+
+        viewModelScope.launch {
+            val result = repository.createPost(
+                userId = current.id,
+                user = current,
+                mediaUri = mediaUri,
+                isVideo = isVideo,
+                caption = caption,
+                context = context,
+                onProgress = { _postUploadProgress.value = it }
+            )
+
+            _isUploadingPost.value = false
+            _postUploadProgress.value = 0f
+
+            result.onSuccess {
+                _infoMessage.value = "Post shared to feed!"
+                onComplete()
+            }.onFailure { err ->
+                _errorMessage.value = "Failed to upload post: ${err.localizedMessage ?: "Upload error"}"
+            }
+        }
+    }
+
+    fun toggleLikePost(postId: String) {
+        val current = _currentUser.value ?: return
+        viewModelScope.launch {
+            repository.toggleLikePost(postId, current.id)
+        }
+    }
+
+    fun deletePost(post: Post) {
+        val current = _currentUser.value ?: return
+        if (post.userId != current.id) {
+            _errorMessage.value = "You can only delete your own posts"
+            return
+        }
+
+        viewModelScope.launch {
+            val result = repository.deletePost(current.id, post.id, post.mediaUrl)
+            result.onSuccess {
+                _infoMessage.value = "Post deleted"
+            }.onFailure { err ->
+                _errorMessage.value = "Failed to delete post: ${err.localizedMessage ?: "Delete error"}"
+            }
+        }
+    }
+
+    // -------------------------------------------------------------
+    // MESSAGE REQUESTS OPERATIONS
+    // -------------------------------------------------------------
+
+    fun acceptMessageRequest(request: MessageRequest) {
+        val current = _currentUser.value ?: return
+        viewModelScope.launch {
+            repository.acceptMessageRequest(current.id, request.fromUserId, request.requestId)
+            _infoMessage.value = "Message request accepted from ${request.fromUser.displayName}"
+        }
+    }
+
+    fun declineMessageRequest(request: MessageRequest) {
+        val current = _currentUser.value ?: return
+        viewModelScope.launch {
+            repository.declineMessageRequest(current.id, request.requestId)
+            _infoMessage.value = "Message request declined"
+        }
+    }
+
+    // -------------------------------------------------------------
+    // MODERATION & USER BLOCKING
+    // -------------------------------------------------------------
+
+    fun blockUser(targetUserId: String) {
+        val current = _currentUser.value ?: return
+        viewModelScope.launch {
+            repository.blockUser(current.id, targetUserId)
+            _infoMessage.value = "User blocked"
+            if (_activeContact.value?.id == targetUserId) {
+                closeChat()
+            }
+        }
+    }
+
+    fun unblockUser(targetUserId: String) {
+        val current = _currentUser.value ?: return
+        viewModelScope.launch {
+            repository.unblockUser(current.id, targetUserId)
+            _infoMessage.value = "User unblocked"
+        }
+    }
+
+    fun submitReport(
+        reportedUserId: String,
+        reportedUserName: String,
+        reason: String,
+        details: String = "",
+        contentSnippet: String = ""
+    ) {
+        val current = _currentUser.value ?: return
+        viewModelScope.launch {
+            val report = UserReport(
+                reportId = "report_${System.currentTimeMillis()}",
+                reporterId = current.id,
+                reporterName = current.displayName.ifBlank { current.username },
+                reportedUserId = reportedUserId,
+                reportedUserName = reportedUserName,
+                reason = reason,
+                details = details,
+                contentSnippet = contentSnippet,
+                timestamp = System.currentTimeMillis()
+            )
+            val result = repository.submitReport(report)
+            result.onSuccess {
+                _infoMessage.value = "Report submitted. Thank you for keeping our community safe."
+            }.onFailure { err ->
+                _errorMessage.value = "Could not submit report: ${err.localizedMessage}"
+            }
+        }
+    }
+
+    fun deleteAccount(onSuccess: () -> Unit = {}) {
+        val current = _currentUser.value ?: return
+        viewModelScope.launch {
+            val result = repository.deleteAccount(current.id, current.username)
+            _currentUser.value = null
+            _activeContact.value = null
+            _authUiState.value = AuthUiState.Idle
+            result.onSuccess {
+                _infoMessage.value = "Your account has been deleted."
+                onSuccess()
+            }.onFailure {
+                _infoMessage.value = "Account signed out and deleted."
+                onSuccess()
+            }
+        }
+    }
+
+    // -------------------------------------------------------------
+    // TEMPORARY / DISAPPEARING MEDIA
+    // -------------------------------------------------------------
+
+    fun markTemporaryMediaViewed(messageId: String) {
+        val user = _currentUser.value ?: return
+        val contact = _activeContact.value ?: return
+        val chatId = repository.getChatId(user.id, contact.id)
+        viewModelScope.launch {
+            repository.markTemporaryMediaViewed(chatId, messageId)
+        }
+    }
+
+    fun markMediaExpired(messageId: String) {
+        val user = _currentUser.value ?: return
+        val contact = _activeContact.value ?: return
+        val chatId = repository.getChatId(user.id, contact.id)
+        viewModelScope.launch {
+            repository.markMediaExpired(chatId, messageId)
         }
     }
 
