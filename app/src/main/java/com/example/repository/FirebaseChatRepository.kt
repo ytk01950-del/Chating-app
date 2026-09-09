@@ -3,6 +3,9 @@ package com.example.repository
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import com.example.model.CallRecord
+import com.example.model.CallSession
+import com.example.model.CallType
 import com.example.model.ChatMessage
 import com.example.model.MessageRequest
 import com.example.model.MessageType
@@ -10,6 +13,7 @@ import com.example.model.Post
 import com.example.model.Story
 import com.example.model.User
 import com.example.model.UserReport
+import com.example.service.CallSignalingService
 import com.example.service.SupabaseStorageService
 import com.example.util.FileUtils
 import com.google.firebase.FirebaseApp
@@ -1511,6 +1515,50 @@ class FirebaseChatRepository {
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    // -------------------------------------------------------------
+    // WEBRTC / 1-ON-1 AUDIO & VIDEO CALLING SYSTEM
+    // -------------------------------------------------------------
+
+    private val callSignalingService: CallSignalingService by lazy {
+        CallSignalingService(database)
+    }
+
+    fun observeIncomingCall(currentUserId: String): Flow<CallSession?> {
+        return callSignalingService.observeIncomingCall(currentUserId)
+    }
+
+    fun observeCallSession(callId: String): Flow<CallSession?> {
+        return callSignalingService.observeCallSession(callId)
+    }
+
+    fun observeCallHistory(userId: String): Flow<List<CallRecord>> {
+        return callSignalingService.observeCallHistory(userId)
+    }
+
+    suspend fun startCall(caller: User, receiver: User, callType: CallType): Result<CallSession> {
+        return callSignalingService.startCall(caller, receiver, callType)
+    }
+
+    suspend fun acceptCall(callId: String): Result<Unit> {
+        return callSignalingService.acceptCall(callId)
+    }
+
+    suspend fun rejectCall(call: CallSession): Result<Unit> {
+        return callSignalingService.rejectCall(call)
+    }
+
+    suspend fun endCall(call: CallSession): Result<Unit> {
+        return callSignalingService.endCall(call)
+    }
+
+    fun setSpeakerphone(context: Context, enabled: Boolean) {
+        callSignalingService.setSpeakerphone(context, enabled)
+    }
+
+    fun setMicrophoneMute(context: Context, muted: Boolean) {
+        callSignalingService.setMicrophoneMute(context, muted)
     }
 }
 

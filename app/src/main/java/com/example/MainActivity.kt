@@ -36,9 +36,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.model.User
+import com.example.ui.screens.ActiveCallScreen
 import com.example.ui.screens.AuthScreen
 import com.example.ui.screens.ChatDetailScreen
 import com.example.ui.screens.CreateStoryDialog
+import com.example.ui.screens.IncomingCallDialog
 import com.example.ui.screens.SocialProfileScreen
 import com.example.ui.screens.StoryViewerDialog
 import com.example.ui.screens.UserDirectoryScreen
@@ -116,6 +119,68 @@ fun WpChatApp(
     val isUploadingMedia by viewModel.isUploadingMedia.collectAsStateWithLifecycle()
     val mediaUploadProgress by viewModel.mediaUploadProgress.collectAsStateWithLifecycle()
     val uploadingFileName by viewModel.uploadingFileName.collectAsStateWithLifecycle()
+
+    // 1-on-1 Audio and Video Calling State
+    val incomingCall by viewModel.incomingCall.collectAsStateWithLifecycle()
+    val activeCallSession by viewModel.activeCallSession.collectAsStateWithLifecycle()
+    val callHistory by viewModel.callHistory.collectAsStateWithLifecycle()
+    val isSpeakerOn by viewModel.isSpeakerOn.collectAsStateWithLifecycle()
+    val isMicMuted by viewModel.isMicMuted.collectAsStateWithLifecycle()
+    val isVideoCameraOff by viewModel.isVideoCameraOff.collectAsStateWithLifecycle()
+    val isFrontCamera by viewModel.isFrontCamera.collectAsStateWithLifecycle()
+    val callDurationSeconds by viewModel.callDurationSeconds.collectAsStateWithLifecycle()
+
+    var pendingCallTarget by remember { mutableStateOf<User?>(null) }
+    var pendingCallIsVideo by remember { mutableStateOf(false) }
+
+    val callPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val recordAudioGranted = permissions[Manifest.permission.RECORD_AUDIO] == true
+        val cameraGranted = permissions[Manifest.permission.CAMERA] == true
+        val target = pendingCallTarget
+        val isVideo = pendingCallIsVideo
+        pendingCallTarget = null
+
+        if (target != null) {
+            if (isVideo) {
+                if (recordAudioGranted && cameraGranted) {
+                    viewModel.startVideoCall(target, context)
+                } else {
+                    viewModel.showError("Microphone and Camera permissions are required for video calls")
+                }
+            } else {
+                if (recordAudioGranted) {
+                    viewModel.startAudioCall(target, context)
+                } else {
+                    viewModel.showError("Microphone permission is required for voice calls")
+                }
+            }
+        }
+    }
+
+    val requestAndStartCall: (User, Boolean) -> Unit = { targetUser, isVideo ->
+        val hasAudio = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        val hasCamera = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+
+        if (isVideo) {
+            if (hasAudio && hasCamera) {
+                viewModel.startVideoCall(targetUser, context)
+            } else {
+                pendingCallTarget = targetUser
+                pendingCallIsVideo = true
+                callPermissionLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.CAMERA))
+            }
+        } else {
+            if (hasAudio) {
+                viewModel.startAudioCall(targetUser, context)
+            } else {
+                pendingCallTarget = targetUser
+                pendingCallIsVideo = false
+                callPermissionLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
+            }
+        }
+    }
 
     // Local dialog state for adding stories directly from directory tray
     var pendingTrayMediaUri by remember { androidx.compose.runtime.mutableStateOf<android.net.Uri?>(null) }
@@ -227,6 +292,16 @@ fun WpChatApp(
                                 searchUserNotFound = searchUserNotFound,
                                 myStories = activeStories.filter { it.userId == user.id },
                                 groupedStories = groupedStories,
+                                callHistory = callHistory,
+                                onStartVoiceCall = { targetUser ->
+                                    requestAndStartCall(targetUser, false)
+                                },
+                                onStartVideoCall = { targetUser ->
+                                    requestAndStartCall(targetUser, true)
+                                },
+                                onOpenOtherUserProfile = { targetUser ->
+                                    viewModel.openUserProfile(targetUser)
+                                },
                                 onOpenAddStory = {
                                     trayStoryPickerLauncher.launch(
                                         PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
@@ -316,11 +391,61 @@ fun WpChatApp(
                                 },
                                 onOpenUserProfile = { targetUser ->
                                     viewModel.openUserProfile(targetUser)
+                                },
+                                onStartVoiceCall = {
+                                    requestAndStartCall(contact, false)
+                                },
+                                onStartVideoCall = {
+                                    requestAndStartCall(contact, true)
                                 }
                             )
                         }
                     }
                 }
+            }
+
+            // Global Incoming Call Screen Overlay
+            incomingCall?.let { session ->
+                IncomingCallDialog(
+                    callSession = session,
+                    onAccept = {
+                        val hasAudio = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+                        val hasCamera = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+
+                        if (session.isVideo && (!hasAudio || !hasCamera)) {
+                            pendingCallTarget = null
+                            callPermissionLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.CAMERA))
+                        } else if (!session.isVideo && !hasAudio) {
+                            pendingCallTarget = null
+                            callPermissionLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
+                        } else {
+                            viewModel.acceptIncomingCall(context)
+                        }
+                    },
+                    onReject = {
+                        viewModel.rejectIncomingCall()
+                    }
+                )
+            }
+
+            // Global Active Call Screen (Outgoing / Ringing / Connected)
+            val currentSession = activeCallSession
+            val currentLoggedInUser = currentUser
+            if (currentSession != null && currentLoggedInUser != null) {
+                ActiveCallScreen(
+                    currentUser = currentLoggedInUser,
+                    callSession = currentSession,
+                    durationSeconds = callDurationSeconds,
+                    isSpeakerOn = isSpeakerOn,
+                    isMicMuted = isMicMuted,
+                    isVideoCameraOff = isVideoCameraOff,
+                    isFrontCamera = isFrontCamera,
+                    onToggleSpeaker = { viewModel.toggleSpeaker(context) },
+                    onToggleMute = { viewModel.toggleMute(context) },
+                    onToggleVideoCamera = { viewModel.toggleVideoCamera() },
+                    onSwitchCamera = { viewModel.switchCameraFacing() },
+                    onEndCall = { viewModel.endActiveCall(context) }
+                )
             }
 
             // Global Full-Screen 24-Hour Story Viewer

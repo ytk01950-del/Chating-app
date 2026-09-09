@@ -1,6 +1,6 @@
 {
   "name": "WP CHAT",
-  "description": "A modern real-time chatting app with Firebase authentication, social profiles with custom photos and posts, complete media and file sharing, live presence, and sleek Material 3 interface.",
+  "description": "A modern real-time messaging app with 1-on-1 audio and video calling, incoming call receiving UI, call history log, social profiles, media sharing, and live presence.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -54,6 +55,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Audiotrack
+import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Description
@@ -156,6 +158,8 @@ fun ChatDetailScreen(
     onInputChange: (String) -> Unit,
     onAddReaction: (messageId: String, reaction: String) -> Unit,
     onOpenUserProfile: (User) -> Unit = {},
+    onStartVoiceCall: () -> Unit = {},
+    onStartVideoCall: () -> Unit = {},
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -249,7 +253,7 @@ fun ChatDetailScreen(
     Scaffold(
         modifier = Modifier
             .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.navigationBars),
+            .imePadding(),
         containerColor = DarkBg,
         topBar = {
             Surface(
@@ -319,15 +323,38 @@ fun ChatDetailScreen(
                         }
                     }
 
-                    // Action buttons
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    // Action buttons (Voice Call, Video Call, Profile, Emojis)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        AppIconButton(
+                            icon = Icons.Default.Call,
+                            contentDescription = "Voice Call",
+                            onClick = onStartVoiceCall,
+                            tint = AccentBlue,
+                            size = 36.dp,
+                            iconSize = 19.dp,
+                            testTag = "chat_header_voice_call_btn"
+                        )
+
+                        AppIconButton(
+                            icon = Icons.Default.Videocam,
+                            contentDescription = "Video Call",
+                            onClick = onStartVideoCall,
+                            tint = Color(0xFF38BDF8),
+                            size = 36.dp,
+                            iconSize = 20.dp,
+                            testTag = "chat_header_video_call_btn"
+                        )
+
                         AppIconButton(
                             icon = Icons.Default.Person,
                             contentDescription = "View Profile",
                             onClick = { onOpenUserProfile(otherUser) },
-                            tint = AccentBlue,
-                            size = 38.dp,
-                            iconSize = 20.dp,
+                            tint = TextSecondary,
+                            size = 36.dp,
+                            iconSize = 19.dp,
                             testTag = "chat_header_view_profile"
                         )
 
@@ -336,8 +363,8 @@ fun ChatDetailScreen(
                             contentDescription = "Emojis",
                             onClick = { showEmojiBar = !showEmojiBar },
                             tint = if (showEmojiBar) AccentBlue else TextSecondary,
-                            size = 38.dp,
-                            iconSize = 20.dp
+                            size = 36.dp,
+                            iconSize = 19.dp
                         )
                     }
                 }
@@ -601,8 +628,7 @@ fun ChatDetailScreen(
             // Composer Bar
             Surface(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.ime),
+                    .fillMaxWidth(),
                 color = DarkBg
             ) {
                 Column(

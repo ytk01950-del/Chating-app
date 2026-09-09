@@ -4,6 +4,10 @@ import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.model.CallRecord
+import com.example.model.CallSession
+import com.example.model.CallStatus
+import com.example.model.CallType
 import com.example.model.ChatMessage
 import com.example.model.MessageRequest
 import com.example.model.MessageType
@@ -122,6 +126,33 @@ class ChatViewModel(
     private val _uploadingFileName = MutableStateFlow("")
     val uploadingFileName: StateFlow<String> = _uploadingFileName.asStateFlow()
 
+    // -------------------------------------------------------------
+    // WEBRTC / 1-ON-1 AUDIO & VIDEO CALLING STATE
+    // -------------------------------------------------------------
+    private val _incomingCall = MutableStateFlow<CallSession?>(null)
+    val incomingCall: StateFlow<CallSession?> = _incomingCall.asStateFlow()
+
+    private val _activeCallSession = MutableStateFlow<CallSession?>(null)
+    val activeCallSession: StateFlow<CallSession?> = _activeCallSession.asStateFlow()
+
+    private val _callHistory = MutableStateFlow<List<CallRecord>>(emptyList())
+    val callHistory: StateFlow<List<CallRecord>> = _callHistory.asStateFlow()
+
+    private val _isSpeakerOn = MutableStateFlow(false)
+    val isSpeakerOn: StateFlow<Boolean> = _isSpeakerOn.asStateFlow()
+
+    private val _isMicMuted = MutableStateFlow(false)
+    val isMicMuted: StateFlow<Boolean> = _isMicMuted.asStateFlow()
+
+    private val _isVideoCameraOff = MutableStateFlow(false)
+    val isVideoCameraOff: StateFlow<Boolean> = _isVideoCameraOff.asStateFlow()
+
+    private val _isFrontCamera = MutableStateFlow(true)
+    val isFrontCamera: StateFlow<Boolean> = _isFrontCamera.asStateFlow()
+
+    private val _callDurationSeconds = MutableStateFlow(0L)
+    val callDurationSeconds: StateFlow<Long> = _callDurationSeconds.asStateFlow()
+
     private var messagesJob: Job? = null
     private var typingJob: Job? = null
     private var usersJob: Job? = null
@@ -132,6 +163,10 @@ class ChatViewModel(
     private var blockedUsersJob: Job? = null
     private var profileStoriesJob: Job? = null
     private var typingDebounceJob: Job? = null
+    private var incomingCallJob: Job? = null
+    private var activeCallJob: Job? = null
+    private var callHistoryJob: Job? = null
+    private var callTimerJob: Job? = null
 
     // Grouped active stories for the Instagram/Snapchat style story tray
     val groupedStories: StateFlow<List<UserStoryGroup>> = combine(_activeStories, _allUsers, _currentUser) { stories, users, current ->
@@ -389,6 +424,9 @@ class ChatViewModel(
             _messageRequests.value = emptyList()
             _blockedUserIds.value = emptySet()
             _activeStoryViewer.value = null
+            _incomingCall.value = null
+            _activeCallSession.value = null
+            _callHistory.value = emptyList()
             _authUiState.value = AuthUiState.Idle
             usersJob?.cancel()
             onlineUsersJob?.cancel()
@@ -399,6 +437,10 @@ class ChatViewModel(
             messageRequestsJob?.cancel()
             blockedUsersJob?.cancel()
             profileStoriesJob?.cancel()
+            incomingCallJob?.cancel()
+            activeCallJob?.cancel()
+            callHistoryJob?.cancel()
+            callTimerJob?.cancel()
         }
     }
 
@@ -448,6 +490,25 @@ class ChatViewModel(
         activeStoriesJob = viewModelScope.launch {
             repository.observeActiveStories().collect { stories ->
                 _activeStories.value = stories
+            }
+        }
+
+        // Real-time incoming call observer
+        incomingCallJob?.cancel()
+        incomingCallJob = viewModelScope.launch {
+            repository.observeIncomingCall(currentUserId).collect { session ->
+                // Only show incoming call if we aren't already on an active call
+                if (_activeCallSession.value == null) {
+                    _incomingCall.value = session
+                }
+            }
+        }
+
+        // Real-time call history observer
+        callHistoryJob?.cancel()
+        callHistoryJob = viewModelScope.launch {
+            repository.observeCallHistory(currentUserId).collect { history ->
+                _callHistory.value = history
             }
         }
 
@@ -957,6 +1018,170 @@ class ChatViewModel(
         viewModelScope.launch {
             repository.markMediaExpired(chatId, messageId)
         }
+    }
+
+    // -------------------------------------------------------------
+    // WEBRTC / 1-ON-1 AUDIO & VIDEO CALLING ACTIONS
+    // -------------------------------------------------------------
+
+    fun startAudioCall(receiver: User, context: Context? = null) {
+        initiateCall(receiver, CallType.AUDIO, context)
+    }
+
+    fun startVideoCall(receiver: User, context: Context? = null) {
+        initiateCall(receiver, CallType.VIDEO, context)
+    }
+
+    private fun initiateCall(receiver: User, callType: CallType, context: Context? = null) {
+        val current = _currentUser.value ?: return
+        if (current.id == receiver.id) {
+            _errorMessage.value = "Cannot call yourself"
+            return
+        }
+
+        viewModelScope.launch {
+            _isSpeakerOn.value = callType == CallType.VIDEO // default speaker on for video
+            _isMicMuted.value = false
+            _isVideoCameraOff.value = false
+            _isFrontCamera.value = true
+            _callDurationSeconds.value = 0L
+
+            if (context != null) {
+                repository.setSpeakerphone(context, _isSpeakerOn.value)
+                repository.setMicrophoneMute(context, false)
+            }
+
+            val result = repository.startCall(current, receiver, callType)
+            result.onSuccess { session ->
+                _activeCallSession.value = session
+                listenToActiveCallSession(session.callId)
+            }.onFailure { err ->
+                _errorMessage.value = "Failed to start call: ${err.localizedMessage}"
+            }
+        }
+    }
+
+    fun acceptIncomingCall(context: Context? = null) {
+        val incoming = _incomingCall.value ?: return
+        viewModelScope.launch {
+            _incomingCall.value = null
+            _isSpeakerOn.value = incoming.isVideoCall()
+            _isMicMuted.value = false
+            _isVideoCameraOff.value = false
+            _isFrontCamera.value = true
+            _callDurationSeconds.value = 0L
+
+            if (context != null) {
+                repository.setSpeakerphone(context, _isSpeakerOn.value)
+                repository.setMicrophoneMute(context, false)
+            }
+
+            val result = repository.acceptCall(incoming.callId)
+            result.onSuccess {
+                val updatedSession = incoming.copy(
+                    status = CallStatus.ACCEPTED.name,
+                    startedAt = System.currentTimeMillis()
+                )
+                _activeCallSession.value = updatedSession
+                listenToActiveCallSession(incoming.callId)
+                startCallTimer()
+            }.onFailure { err ->
+                _errorMessage.value = "Failed to accept call: ${err.localizedMessage}"
+            }
+        }
+    }
+
+    fun rejectIncomingCall() {
+        val incoming = _incomingCall.value ?: return
+        viewModelScope.launch {
+            _incomingCall.value = null
+            repository.rejectCall(incoming)
+        }
+    }
+
+    fun endActiveCall(context: Context? = null) {
+        val active = _activeCallSession.value
+        val incoming = _incomingCall.value
+
+        viewModelScope.launch {
+            callTimerJob?.cancel()
+            activeCallJob?.cancel()
+
+            if (active != null) {
+                _activeCallSession.value = null
+                repository.endCall(active)
+            } else if (incoming != null) {
+                _incomingCall.value = null
+                repository.rejectCall(incoming)
+            }
+
+            if (context != null) {
+                repository.setSpeakerphone(context, false)
+                repository.setMicrophoneMute(context, false)
+            }
+
+            _callDurationSeconds.value = 0L
+        }
+    }
+
+    private fun listenToActiveCallSession(callId: String) {
+        activeCallJob?.cancel()
+        activeCallJob = viewModelScope.launch {
+            repository.observeCallSession(callId).collect { session ->
+                if (session == null || session.status == CallStatus.ENDED.name ||
+                    session.status == CallStatus.REJECTED.name || session.status == CallStatus.MISSED.name
+                ) {
+                    callTimerJob?.cancel()
+                    _activeCallSession.value = null
+                    _callDurationSeconds.value = 0L
+                    activeCallJob?.cancel()
+                } else {
+                    _activeCallSession.value = session
+                    if (session.status == CallStatus.ACCEPTED.name && callTimerJob == null) {
+                        startCallTimer()
+                    }
+                }
+            }
+        }
+    }
+
+    private fun startCallTimer() {
+        callTimerJob?.cancel()
+        callTimerJob = viewModelScope.launch {
+            _callDurationSeconds.value = 0L
+            while (true) {
+                delay(1000)
+                _callDurationSeconds.value += 1
+            }
+        }
+    }
+
+    fun toggleSpeaker(context: Context) {
+        val next = !_isSpeakerOn.value
+        _isSpeakerOn.value = next
+        repository.setSpeakerphone(context, next)
+    }
+
+    fun toggleMute(context: Context) {
+        val next = !_isMicMuted.value
+        _isMicMuted.value = next
+        repository.setMicrophoneMute(context, next)
+    }
+
+    fun toggleVideoCamera() {
+        _isVideoCameraOff.value = !_isVideoCameraOff.value
+    }
+
+    fun switchCameraFacing() {
+        _isFrontCamera.value = !_isFrontCamera.value
+    }
+
+    fun showError(message: String) {
+        _errorMessage.value = message
+    }
+
+    fun showInfo(message: String) {
+        _infoMessage.value = message
     }
 
     fun clearError() {

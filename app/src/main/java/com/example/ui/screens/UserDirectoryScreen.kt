@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -30,6 +31,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.AlternateEmail
+import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.FilterList
@@ -73,6 +75,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.model.CallRecord
 import com.example.model.Story
 import com.example.model.User
 import com.example.model.UserStoryGroup
@@ -110,6 +113,10 @@ fun UserDirectoryScreen(
     searchUserNotFound: Boolean,
     myStories: List<Story> = emptyList(),
     groupedStories: List<UserStoryGroup> = emptyList(),
+    callHistory: List<CallRecord> = emptyList(),
+    onStartVoiceCall: (User) -> Unit = {},
+    onStartVideoCall: (User) -> Unit = {},
+    onOpenOtherUserProfile: (User) -> Unit = {},
     onOpenAddStory: () -> Unit = {},
     onViewUserStories: (User, List<Story>) -> Unit = { _, _ -> },
     onSearchByChatId: (String) -> Unit,
@@ -119,7 +126,7 @@ fun UserDirectoryScreen(
     onOpenProfile: () -> Unit,
     onSignOut: () -> Unit
 ) {
-    var activeSearchTab by remember { mutableIntStateOf(0) } // 0 = Chats, 1 = Search Directory
+    var activeSearchTab by remember { mutableIntStateOf(0) } // 0 = Chats, 1 = Calls, 2 = Search Users
     var chatIdQuery by remember { mutableStateOf("") }
     var filterOnlineOnly by remember { mutableStateOf(false) }
 
@@ -133,7 +140,7 @@ fun UserDirectoryScreen(
     Scaffold(
         modifier = Modifier
             .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.navigationBars),
+            .imePadding(),
         containerColor = DarkBg,
         topBar = {
             Surface(
@@ -321,11 +328,32 @@ fun UserDirectoryScreen(
                         )
                         Tab(
                             selected = activeSearchTab == 1,
+                            onClick = { activeSearchTab = 1 },
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.Call,
+                                        contentDescription = null,
+                                        tint = if (activeSearchTab == 1) AccentBlue else TextSecondary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        "Calls (${callHistory.size})",
+                                        color = if (activeSearchTab == 1) AccentBlue else TextSecondary,
+                                        fontWeight = if (activeSearchTab == 1) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                }
+                            },
+                            modifier = Modifier.testTag("tab_calls")
+                        )
+                        Tab(
+                            selected = activeSearchTab == 2,
                             onClick = {
                                 if (needsUsername) {
                                     onOpenProfile()
                                 } else {
-                                    activeSearchTab = 1
+                                    activeSearchTab = 2
                                 }
                             },
                             text = {
@@ -333,14 +361,14 @@ fun UserDirectoryScreen(
                                     Icon(
                                         Icons.Default.Search,
                                         contentDescription = null,
-                                        tint = if (activeSearchTab == 1) AccentBlue else TextSecondary,
+                                        tint = if (activeSearchTab == 2) AccentBlue else TextSecondary,
                                         modifier = Modifier.size(16.dp)
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
-                                        "Search Users",
-                                        color = if (activeSearchTab == 1) AccentBlue else TextSecondary,
-                                        fontWeight = if (activeSearchTab == 1) FontWeight.Bold else FontWeight.Normal
+                                        "Search",
+                                        color = if (activeSearchTab == 2) AccentBlue else TextSecondary,
+                                        fontWeight = if (activeSearchTab == 2) FontWeight.Bold else FontWeight.Normal
                                     )
                                 }
                             },
@@ -420,8 +448,8 @@ fun UserDirectoryScreen(
                                 }
                             }
                         }
-                    } else {
-                        // Content for Tab 1: Search Users by Chat ID or Name
+                    } else if (activeSearchTab == 2) {
+                        // Content for Tab 2: Search Users by Chat ID or Name
                         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -458,7 +486,7 @@ fun UserDirectoryScreen(
                                         }
                                     },
                                     singleLine = true,
-                                    shape = RoundedCornerShape(16.dp),
+                                    shape = RoundedCornerShape(24.dp),
                                     colors = OutlinedTextFieldDefaults.colors(
                                         focusedTextColor = TextPrimary,
                                         unfocusedTextColor = TextPrimary,
@@ -493,6 +521,14 @@ fun UserDirectoryScreen(
 
             // View rendering based on active tab
             if (activeSearchTab == 1) {
+                // Calls tab view
+                CallsTab(
+                    callHistory = callHistory,
+                    onStartVoiceCall = onStartVoiceCall,
+                    onStartVideoCall = onStartVideoCall,
+                    onOpenUserProfile = onOpenOtherUserProfile
+                )
+            } else if (activeSearchTab == 2) {
                 // Search users results view
                 Box(
                     modifier = Modifier
@@ -706,7 +742,7 @@ fun UserDirectoryScreen(
                             Spacer(modifier = Modifier.height(16.dp))
                             AppPrimaryButton(
                                 text = "Find Users to Chat",
-                                onClick = { activeSearchTab = 1 },
+                                onClick = { activeSearchTab = 2 },
                                 icon = Icons.Default.Search,
                                 height = 44.dp
                             )

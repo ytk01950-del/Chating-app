@@ -15,10 +15,10 @@ object SupabaseConfig {
     private const val TAG = "SupabaseConfig"
 
     // Default Supabase Project URL (Public REST & Storage endpoint)
-    const val DEFAULT_SUPABASE_URL = "https://kocljxupqwhwimfqvuxw.supabase.co"
+    const val DEFAULT_SUPABASE_URL = "https://bibcwocmuplcjjizlmha.supabase.co"
 
-    // Default Supabase Public Anon Key (Client-safe public publishable key)
-    const val DEFAULT_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtvY2xqeHVwcXdod2ltZnF2dXh3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEyMzQ1NjcsImV4cCI6MjA1NjgwNjU2N30.C2l19D0W8qN9mNqR_wL0nQ8rF2jG8s7d6e5a4b3c2d1"
+    // Default Supabase Public Anon / Publishable Key (Client-safe public key)
+    const val DEFAULT_SUPABASE_ANON_KEY = "sb_publishable_YvXo53axWYs5prN-nNRztg_RVozqYf_"
 
     /**
      * Initializes the built-in Supabase client configuration on app launch.
