@@ -296,7 +296,7 @@ fun ChatDetailScreen(
                                 avatarId = otherUser.avatarId,
                                 photoUrl = otherUser.photoUrl,
                                 size = 42.dp,
-                                isOnline = otherUser.isOnline
+                                isOnline = false
                             )
 
                             Column {
@@ -310,15 +310,16 @@ fun ChatDetailScreen(
                                 )
                                 val subtitle = when {
                                     isOtherUserTyping -> "Typing..."
-                                    otherUser.isOnline -> "Online"
                                     otherUser.username.isNotBlank() -> "@${otherUser.username}"
-                                    else -> formatChatLastSeen(otherUser.lastSeen)
+                                    else -> ""
                                 }
-                                Text(
-                                    text = subtitle,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = if (isOtherUserTyping || otherUser.isOnline) OnlineGreen else TextMuted
-                                )
+                                if (subtitle.isNotBlank()) {
+                                    Text(
+                                        text = subtitle,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (isOtherUserTyping) OnlineGreen else TextMuted
+                                    )
+                                }
                             }
                         }
                     }
