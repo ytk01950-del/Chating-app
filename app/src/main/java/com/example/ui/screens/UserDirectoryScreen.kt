@@ -139,8 +139,8 @@ fun UserDirectoryScreen(
         topBar = {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                color = colors.surface,
-                border = BorderStroke(1.dp, colors.border)
+                color = if (colors.isDark) Color(0xFF000000) else colors.surface,
+                border = BorderStroke(1.dp, if (colors.isDark) Color(0xFF262626) else colors.border)
             ) {
                 Row(
                     modifier = Modifier
@@ -197,7 +197,7 @@ fun UserDirectoryScreen(
                             Icon(
                                 imageVector = Icons.Default.Search,
                                 contentDescription = "Search",
-                                tint = if (isSearchUsersMode) colors.accentOrange else colors.textPrimary,
+                                tint = if (isSearchUsersMode) Color(0xFF2563EB) else colors.textPrimary,
                                 modifier = Modifier.size(22.dp)
                             )
                         }
@@ -334,8 +334,8 @@ private fun ChatsTabView(
         // Claim username banner
         if (needsUsername) {
             Surface(
-                color = if (colors.isDark) Color(0xFF2A1C0A) else Color(0xFFFFF7ED),
-                border = BorderStroke(1.dp, if (colors.isDark) Color(0xFF8A5812) else Color(0xFFFFD8A8)),
+                color = if (colors.isDark) Color(0xFF262626) else Color(0xFFF0F7FF),
+                border = BorderStroke(1.dp, if (colors.isDark) Color(0xFF363636) else Color(0xFFBFDBFE)),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -350,7 +350,7 @@ private fun ChatsTabView(
                     Icon(
                         imageVector = Icons.Default.WarningAmber,
                         contentDescription = null,
-                        tint = colors.accentOrange,
+                        tint = Color(0xFF2563EB),
                         modifier = Modifier.size(22.dp)
                     )
                     Spacer(modifier = Modifier.width(10.dp))
@@ -418,10 +418,10 @@ private fun ChatsTabView(
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = colors.textPrimary,
                         unfocusedTextColor = colors.textPrimary,
-                        focusedContainerColor = colors.surface,
-                        unfocusedContainerColor = colors.surface,
-                        focusedBorderColor = colors.accentOrange,
-                        unfocusedBorderColor = colors.borderSubtle
+                        focusedContainerColor = if (colors.isDark) Color(0xFF262626) else Color(0xFFEFEFEF),
+                        unfocusedContainerColor = if (colors.isDark) Color(0xFF262626) else Color(0xFFEFEFEF),
+                        focusedBorderColor = Color(0xFF2563EB),
+                        unfocusedBorderColor = if (colors.isDark) Color(0xFF363636) else Color(0xFFDBDBDB)
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -469,10 +469,10 @@ private fun ChatsTabView(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = colors.textPrimary,
                             unfocusedTextColor = colors.textPrimary,
-                            focusedContainerColor = colors.surface,
-                            unfocusedContainerColor = colors.surface,
-                            focusedBorderColor = colors.accentOrange,
-                            unfocusedBorderColor = colors.borderSubtle
+                            focusedContainerColor = if (colors.isDark) Color(0xFF262626) else Color(0xFFEFEFEF),
+                            unfocusedContainerColor = if (colors.isDark) Color(0xFF262626) else Color(0xFFEFEFEF),
+                            focusedBorderColor = Color(0xFF2563EB),
+                            unfocusedBorderColor = if (colors.isDark) Color(0xFF363636) else Color(0xFFDBDBDB)
                         ),
                         modifier = Modifier
                             .weight(1f)

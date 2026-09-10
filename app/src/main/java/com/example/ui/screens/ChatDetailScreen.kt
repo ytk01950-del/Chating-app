@@ -1,6 +1,9 @@
 package com.example.ui.screens
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -15,9 +18,11 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -58,6 +63,7 @@ import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.FolderZip
@@ -132,6 +138,7 @@ import com.example.ui.components.AppPrimaryButton
 import com.example.ui.components.AppSecondaryButton
 import com.example.ui.components.AppSendButton
 import com.example.ui.components.AppAttachmentGridItem
+import com.example.ui.components.InstagramSwitch
 import com.example.ui.theme.AccentBlue
 import com.example.ui.theme.AccentBlueDark
 import com.example.ui.theme.DarkBg
@@ -169,6 +176,7 @@ fun ChatDetailScreen(
     onSendMediaMessage: (fileUri: Uri, forcedType: MessageType?, caption: String, viewLimit: Int, allowDownload: Boolean) -> Unit = { _, _, _, _, _ -> },
     onMarkMediaViewed: (messageId: String) -> Unit = {},
     onMarkMediaExpired: (messageId: String) -> Unit = {},
+    onUnsendMessage: (messageId: String) -> Unit = {},
     onInputChange: (String) -> Unit,
     onAddReaction: (messageId: String, reaction: String) -> Unit,
     onOpenUserProfile: (User) -> Unit = {},
@@ -183,6 +191,7 @@ fun ChatDetailScreen(
     var showEmojiBar by remember { mutableStateOf(false) }
     var showAttachmentSheet by remember { mutableStateOf(false) }
     var selectedMessageForReaction by remember { mutableStateOf<ChatMessage?>(null) }
+    var messageForMenuActions by remember { mutableStateOf<ChatMessage?>(null) }
     var selectedImageForPreview by remember { mutableStateOf<String?>(null) }
     var selectedDisappearingMedia by remember { mutableStateOf<ChatMessage?>(null) }
 
@@ -581,6 +590,9 @@ fun ChatDetailScreen(
                                 onSelectForReaction = {
                                     selectedMessageForReaction = if (selectedMessageForReaction == message) null else message
                                 },
+                                onLongClick = {
+                                    messageForMenuActions = message
+                                },
                                 onImageClick = { url ->
                                     selectedImageForPreview = url
                                 },
@@ -888,16 +900,209 @@ fun ChatDetailScreen(
 
     // Disappearing Media 15-Second Full Screen Viewer Dialog
     selectedDisappearingMedia?.let { message ->
+        val isSender = message.senderId == currentUser.id
         DisappearingMediaViewerDialog(
             message = message,
+            isSender = isSender,
             onDismiss = { selectedDisappearingMedia = null },
             onMarkViewed = {
-                onMarkMediaViewed(message.id)
+                if (!isSender) {
+                    onMarkMediaViewed(message.id)
+                }
             },
             onExpire = {
-                onMarkMediaExpired(message.id)
+                if (!isSender) {
+                    onMarkMediaExpired(message.id)
+                }
             }
         )
+    }
+
+    // Message Long-Press Action Menu (Unsend, Copy, Quick Reactions)
+    messageForMenuActions?.let { targetMessage ->
+        val isMe = targetMessage.senderId == currentUser.id
+
+        Dialog(
+            onDismissRequest = { messageForMenuActions = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.65f))
+                    .clickable { messageForMenuActions = null },
+                contentAlignment = Alignment.Center
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .widthIn(max = 320.dp)
+                        .padding(horizontal = 24.dp)
+                        .clickable(enabled = false) {},
+                    shape = RoundedCornerShape(20.dp),
+                    color = DarkSurface,
+                    border = BorderStroke(1.dp, DarkBorderSubtle),
+                    shadowElevation = 16.dp
+                ) {
+                    Column(
+                        modifier = Modifier.padding(18.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        // Quick Emoji Reactions
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(DarkSurfaceVariant, RoundedCornerShape(14.dp))
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            ReactionEmojis.forEach { emoji ->
+                                Text(
+                                    text = emoji,
+                                    fontSize = 24.sp,
+                                    modifier = Modifier
+                                        .clip(CircleShape)
+                                        .clickable {
+                                            onAddReaction(targetMessage.id, emoji)
+                                            messageForMenuActions = null
+                                        }
+                                        .padding(4.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Message Preview Summary
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            color = DarkSurfaceVariant.copy(alpha = 0.6f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = when {
+                                        targetMessage.isDisappearing() -> Icons.Default.Schedule
+                                        targetMessage.getResolvedType() == MessageType.IMAGE -> Icons.Default.Image
+                                        targetMessage.getResolvedType() == MessageType.VIDEO -> Icons.Default.PlayCircleFilled
+                                        targetMessage.getResolvedType() == MessageType.AUDIO -> Icons.Default.PlayArrow
+                                        else -> Icons.Default.Description
+                                    },
+                                    contentDescription = null,
+                                    tint = AccentBlue,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = when {
+                                        targetMessage.isDisappearing() -> "Disappearing Media (${if (targetMessage.viewLimit == 1) "View once" else "View twice"})"
+                                        targetMessage.text.isNotBlank() -> targetMessage.text
+                                        targetMessage.fileName.isNotBlank() -> targetMessage.fileName
+                                        targetMessage.getResolvedType() == MessageType.IMAGE -> "Photo"
+                                        targetMessage.getResolvedType() == MessageType.VIDEO -> "Video"
+                                        else -> "Message"
+                                    },
+                                    color = TextPrimary,
+                                    fontSize = 13.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // 1. Copy text (if text is present)
+                        if (targetMessage.text.isNotBlank()) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable {
+                                        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+                                        val clip = android.content.ClipData.newPlainText("Message Text", targetMessage.text)
+                                        clipboard?.setPrimaryClip(clip)
+                                        android.widget.Toast.makeText(context, "Copied to clipboard", android.widget.Toast.LENGTH_SHORT).show()
+                                        messageForMenuActions = null
+                                    }
+                                    .padding(vertical = 12.dp, horizontal = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Description,
+                                    contentDescription = "Copy",
+                                    tint = TextSecondary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    text = "Copy Text",
+                                    color = TextPrimary,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+
+                        // 2. UNSEND BUTTON (for sent messages and media bubbles)
+                        if (isMe) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(Color(0xFFFF453A).copy(alpha = 0.12f))
+                                    .clickable {
+                                        onUnsendMessage(targetMessage.id)
+                                        messageForMenuActions = null
+                                    }
+                                    .padding(vertical = 12.dp, horizontal = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = "Unsend",
+                                    tint = Color(0xFFFF5252),
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(
+                                        text = "Unsend",
+                                        color = Color(0xFFFF5252),
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "Delete for everyone in real time",
+                                        color = Color(0xFFFF5252).copy(alpha = 0.8f),
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Cancel button
+                        androidx.compose.material3.TextButton(
+                            onClick = { messageForMenuActions = null },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "Cancel",
+                                color = TextMuted,
+                                fontSize = 14.sp
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // Full Screen Image Viewer Dialog
@@ -1183,15 +1388,10 @@ fun AttachmentConfirmDialog(
                                     fontSize = 11.sp
                                 )
                             }
-                            Switch(
+                            InstagramSwitch(
                                 checked = allowDownload,
                                 onCheckedChange = { allowDownload = it },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = Color.White,
-                                    checkedTrackColor = AccentBlue,
-                                    uncheckedThumbColor = TextMuted,
-                                    uncheckedTrackColor = DarkSurfaceVariant
-                                )
+                                testTag = "switch_allow_download"
                             )
                         }
                     }
@@ -1285,11 +1485,13 @@ fun FilterChipOption(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SophisticatedMessageBubble(
     message: ChatMessage,
     isMe: Boolean,
     onSelectForReaction: () -> Unit,
+    onLongClick: () -> Unit = {},
     onImageClick: (String) -> Unit = {},
     onDisappearingMediaClick: (ChatMessage) -> Unit = {},
     onFileClick: () -> Unit = {}
@@ -1337,13 +1539,16 @@ fun SophisticatedMessageBubble(
                         },
                         shape = bubbleShape
                     )
-                    .clickable {
-                        if (isDisappearing && !isExpired) {
-                            onDisappearingMediaClick(message)
-                        } else {
-                            onSelectForReaction()
-                        }
-                    }
+                    .combinedClickable(
+                        onClick = {
+                            if (isDisappearing && !isExpired) {
+                                onDisappearingMediaClick(message)
+                            } else {
+                                onSelectForReaction()
+                            }
+                        },
+                        onLongClick = onLongClick
+                    )
             ) {
                 Column {
                     if (isDisappearing) {
@@ -1388,7 +1593,10 @@ fun SophisticatedMessageBubble(
                             // Active Disappearing Media State
                             Row(
                                 modifier = Modifier
-                                    .clickable { onDisappearingMediaClick(message) }
+                                    .combinedClickable(
+                                        onClick = { onDisappearingMediaClick(message) },
+                                        onLongClick = onLongClick
+                                    )
                                     .padding(horizontal = 14.dp, vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -1451,7 +1659,10 @@ fun SophisticatedMessageBubble(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .heightIn(max = 220.dp)
-                                    .clickable { onImageClick(message.fileUrl) }
+                                    .combinedClickable(
+                                        onClick = { onImageClick(message.fileUrl) },
+                                        onLongClick = onLongClick
+                                    )
                             ) {
                                 AsyncImage(
                                     model = ImageRequest.Builder(LocalContext.current)
@@ -1481,7 +1692,10 @@ fun SophisticatedMessageBubble(
                                     .fillMaxWidth()
                                     .height(180.dp)
                                     .background(Color.Black)
-                                    .clickable { onFileClick() },
+                                    .combinedClickable(
+                                        onClick = { onFileClick() },
+                                        onLongClick = onLongClick
+                                    ),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
@@ -1519,7 +1733,10 @@ fun SophisticatedMessageBubble(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { onFileClick() }
+                                    .combinedClickable(
+                                        onClick = { onFileClick() },
+                                        onLongClick = onLongClick
+                                    )
                                     .padding(horizontal = 12.dp, vertical = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -1575,7 +1792,10 @@ fun SophisticatedMessageBubble(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { onFileClick() }
+                                    .combinedClickable(
+                                        onClick = { onFileClick() },
+                                        onLongClick = onLongClick
+                                    )
                                     .padding(horizontal = 12.dp, vertical = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -1768,6 +1988,7 @@ private fun formatMessageTimestamp(timestamp: Long): String {
 @Composable
 fun DisappearingMediaViewerDialog(
     message: ChatMessage,
+    isSender: Boolean = false,
     onDismiss: () -> Unit,
     onMarkViewed: () -> Unit,
     onExpire: () -> Unit
@@ -1777,18 +1998,22 @@ fun DisappearingMediaViewerDialog(
     var secondsLeft by remember { mutableIntStateOf(totalSeconds) }
     val resolvedType = message.getResolvedType()
 
-    // Mark viewed immediately upon opening
+    // Mark viewed immediately upon opening ONLY if viewer is recipient
     LaunchedEffect(message.id) {
-        onMarkViewed()
+        if (!isSender) {
+            onMarkViewed()
+        }
     }
 
-    // 15-second strict countdown timer
+    // 15-second countdown timer
     LaunchedEffect(message.id) {
         while (secondsLeft > 0) {
             delay(1000L)
             secondsLeft -= 1
         }
-        onExpire()
+        if (!isSender) {
+            onExpire()
+        }
         onDismiss()
     }
 
@@ -1796,7 +2021,9 @@ fun DisappearingMediaViewerDialog(
 
     Dialog(
         onDismissRequest = {
-            onExpire()
+            if (!isSender) {
+                onExpire()
+            }
             onDismiss()
         },
         properties = DialogProperties(
@@ -1863,18 +2090,19 @@ fun DisappearingMediaViewerDialog(
                         .background(Color.Black.copy(alpha = 0.6f))
                         .padding(top = 16.dp, start = 16.dp, end = 16.dp, bottom = 12.dp)
                 ) {
-                    // Linear progress indicator for countdown
-                    LinearProgressIndicator(
-                        progress = { progress },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(4.dp)
-                            .clip(RoundedCornerShape(2.dp)),
-                        color = if (secondsLeft <= 3) Color(0xFFFF5252) else AccentBlue,
-                        trackColor = Color.White.copy(alpha = 0.2f)
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
+                    if (!isSender) {
+                        // Linear progress indicator for recipient countdown
+                        LinearProgressIndicator(
+                            progress = { progress },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(4.dp)
+                                .clip(RoundedCornerShape(2.dp)),
+                            color = if (secondsLeft <= 3) Color(0xFFFF5252) else AccentBlue,
+                            trackColor = Color.White.copy(alpha = 0.2f)
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                    }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -1883,39 +2111,75 @@ fun DisappearingMediaViewerDialog(
                     ) {
                         // Timer Badge & View Limit Info
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Surface(
-                                shape = RoundedCornerShape(14.dp),
-                                color = if (secondsLeft <= 3) Color(0xFFFF5252).copy(alpha = 0.25f) else AccentBlue.copy(alpha = 0.25f),
-                                border = BorderStroke(1.dp, if (secondsLeft <= 3) Color(0xFFFF5252) else AccentBlue)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                            if (isSender) {
+                                Surface(
+                                    shape = RoundedCornerShape(14.dp),
+                                    color = AccentBlue.copy(alpha = 0.25f),
+                                    border = BorderStroke(1.dp, AccentBlue)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Schedule,
-                                        contentDescription = null,
-                                        tint = if (secondsLeft <= 3) Color(0xFFFF5252) else Color.White,
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = "${secondsLeft}s left",
-                                        color = Color.White,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Visibility,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "Sender Preview",
+                                            color = Color.White,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
                                 }
+
+                                Spacer(modifier = Modifier.width(8.dp))
+
+                                Text(
+                                    text = if (message.viewLimit == 1) "View once • Active" else "View twice • Active",
+                                    color = Color.White.copy(alpha = 0.8f),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            } else {
+                                Surface(
+                                    shape = RoundedCornerShape(14.dp),
+                                    color = if (secondsLeft <= 3) Color(0xFFFF5252).copy(alpha = 0.25f) else AccentBlue.copy(alpha = 0.25f),
+                                    border = BorderStroke(1.dp, if (secondsLeft <= 3) Color(0xFFFF5252) else AccentBlue)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Schedule,
+                                            contentDescription = null,
+                                            tint = if (secondsLeft <= 3) Color(0xFFFF5252) else Color.White,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "${secondsLeft}s left",
+                                            color = Color.White,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.width(8.dp))
+
+                                Text(
+                                    text = if (message.viewLimit == 1) "View once" else "View twice",
+                                    color = Color.White.copy(alpha = 0.8f),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
                             }
-
-                            Spacer(modifier = Modifier.width(8.dp))
-
-                            Text(
-                                text = if (message.viewLimit == 1) "View once" else "View twice",
-                                color = Color.White.copy(alpha = 0.8f),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium
-                            )
                         }
 
                         // Actions: Download button (only if allowDownload == true) + Close button
@@ -1946,7 +2210,9 @@ fun DisappearingMediaViewerDialog(
                                 icon = Icons.Default.Close,
                                 contentDescription = "Close",
                                 onClick = {
-                                    onExpire()
+                                    if (!isSender) {
+                                        onExpire()
+                                    }
                                     onDismiss()
                                 },
                                 tint = Color.White,
@@ -1987,7 +2253,7 @@ fun DisappearingMediaViewerDialog(
                         )
 
                         Text(
-                            text = "Auto closes in ${secondsLeft}s",
+                            text = if (isSender) "Sender preview mode" else "Auto closes in ${secondsLeft}s",
                             color = Color.White.copy(alpha = 0.6f),
                             fontSize = 11.sp
                         )

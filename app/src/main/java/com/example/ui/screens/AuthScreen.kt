@@ -84,6 +84,7 @@ import com.example.ui.components.UserAvatar
 import com.example.ui.components.AppPrimaryButton
 import com.example.ui.components.AppSecondaryButton
 import com.example.ui.components.AppButtonShape
+import com.example.ui.components.NexaGeometricLogo
 import com.example.ui.theme.AccentBlue
 import com.example.ui.theme.AccentBlueDark
 import com.example.ui.theme.DarkBg
@@ -184,28 +185,21 @@ fun AuthScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             // App Brand Header
-            Box(
-                modifier = Modifier
-                    .size(68.dp)
-                    .clip(CircleShape)
-                    .background(AccentBlue),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Forum,
-                    contentDescription = "WP CHAT Logo",
-                    tint = AccentBlueDark,
-                    modifier = Modifier.size(36.dp)
-                )
-            }
+            NexaGeometricLogo(
+                size = 88.dp,
+                shape = RoundedCornerShape(20.dp),
+                hasBorder = true,
+                borderColor = Color(0xFF262626),
+                testTag = "auth_nexa_logo"
+            )
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "WP CHAT",
+                text = "NexaChat",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
-                color = TextPrimary
+                color = Color.White
             )
 
             Text(
@@ -553,7 +547,7 @@ fun AuthScreen(
 
                     // Action Button
                     AppPrimaryButton(
-                        text = if (selectedTab == 0) "Log In to WP CHAT" else "Create WP CHAT Account",
+                        text = if (selectedTab == 0) "Log In to Nexa" else "Create Nexa Account",
                         onClick = {
                             focusManager.clearFocus()
                             if (selectedTab == 0) {

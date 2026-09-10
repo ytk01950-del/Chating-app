@@ -779,10 +779,17 @@ class FirebaseChatRepository {
         }
     }
 
-    suspend fun markTemporaryMediaViewed(chatId: String, messageId: String) {
+    suspend fun markTemporaryMediaViewed(chatId: String, messageId: String, viewerId: String = "") {
         try {
             val msgRef = database.getReference("chats").child(chatId).child("messages").child(messageId)
             val snap = msgRef.get().await()
+            val senderId = snap.child("senderId").getValue(String::class.java).orEmpty()
+            
+            // SENDER previewing must NOT mark it as viewed or expired
+            if (viewerId.isNotBlank() && viewerId == senderId) {
+                return
+            }
+
             val currentViews = snap.child("currentViews").getValue(Int::class.java) ?: 0
             val viewLimit = snap.child("viewLimit").getValue(Int::class.java) ?: 0
             val fileUrl = snap.child("fileUrl").getValue(String::class.java).orEmpty()
@@ -816,10 +823,17 @@ class FirebaseChatRepository {
         }
     }
 
-    suspend fun markMediaExpired(chatId: String, messageId: String) {
+    suspend fun markMediaExpired(chatId: String, messageId: String, requesterId: String = "") {
         try {
             val msgRef = database.getReference("chats").child(chatId).child("messages").child(messageId)
             val snap = msgRef.get().await()
+            val senderId = snap.child("senderId").getValue(String::class.java).orEmpty()
+
+            // SENDER previewing must NOT expire the media
+            if (requesterId.isNotBlank() && requesterId == senderId) {
+                return
+            }
+
             val fileUrl = snap.child("fileUrl").getValue(String::class.java).orEmpty()
 
             val updates = mapOf<String, Any>(
@@ -838,6 +852,75 @@ class FirebaseChatRepository {
             }
         } catch (e: Exception) {
             Log.w(tag, "markMediaExpired error: ${e.message}")
+        }
+    }
+
+    /**
+     * Unsend / Delete for Everyone:
+     * Removes the message and media from both sender and recipient databases in real time.
+     */
+    suspend fun unsendMessage(chatId: String, messageId: String, requesterUserId: String): Result<Unit> {
+        return try {
+            val msgRef = database.getReference("chats").child(chatId).child("messages").child(messageId)
+            val snap = msgRef.get().await()
+            if (!snap.exists()) {
+                return Result.success(Unit)
+            }
+            val fileUrl = snap.child("fileUrl").getValue(String::class.java).orEmpty()
+            val senderId = snap.child("senderId").getValue(String::class.java).orEmpty()
+            val receiverId = snap.child("receiverId").getValue(String::class.java).orEmpty()
+
+            // 1. Remove the message node from Realtime Database in real time
+            msgRef.removeValue().await()
+
+            // 2. Delete media file from Supabase Storage if present
+            if (fileUrl.isNotBlank()) {
+                try {
+                    SupabaseStorageService.deleteFileByUrl(fileUrl)
+                    Log.d(tag, "Unsent media file deleted from storage: $fileUrl")
+                } catch (e: Exception) {
+                    Log.w(tag, "Error deleting unsent media from storage: ${e.message}")
+                }
+            }
+
+            // 3. Update the conversation preview snippets in user_chats for both users
+            val remainingSnap = database.getReference("chats").child(chatId).child("messages").get().await()
+            var latestMsg: ChatMessage? = null
+            for (child in remainingSnap.children) {
+                val m = child.getValue(ChatMessage::class.java)
+                if (m != null && (latestMsg == null || m.timestamp > latestMsg.timestamp)) {
+                    latestMsg = m
+                }
+            }
+
+            val targetSender = if (senderId.isNotBlank()) senderId else requesterUserId
+            if (latestMsg != null) {
+                val lastText = if (latestMsg.text.isNotBlank()) latestMsg.text else "[Media]"
+                val sSnippet = mapOf(
+                    "otherUserId" to receiverId,
+                    "lastMessage" to lastText,
+                    "lastTimestamp" to latestMsg.timestamp
+                )
+                database.getReference("user_chats").child(targetSender).child(chatId).setValue(sSnippet)
+                if (receiverId.isNotBlank()) {
+                    val rSnippet = mapOf(
+                        "otherUserId" to targetSender,
+                        "lastMessage" to lastText,
+                        "lastTimestamp" to latestMsg.timestamp
+                    )
+                    database.getReference("user_chats").child(receiverId).child(chatId).setValue(rSnippet)
+                }
+            } else {
+                database.getReference("user_chats").child(targetSender).child(chatId).removeValue()
+                if (receiverId.isNotBlank()) {
+                    database.getReference("user_chats").child(receiverId).child(chatId).removeValue()
+                }
+            }
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(tag, "unsendMessage error: ${e.message}", e)
+            Result.failure(e)
         }
     }
 

@@ -37,6 +37,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.model.User
+import com.example.ui.components.NexaSplashScreen
 import com.example.ui.screens.ActiveCallScreen
 import com.example.ui.screens.AuthScreen
 import com.example.ui.screens.ChatDetailScreen
@@ -250,14 +251,23 @@ fun WpChatApp(
         }
     }
 
+    var isSplashVisible by remember { mutableStateOf(true) }
+
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
-        Scaffold(
-            snackbarHost = { SnackbarHost(snackbarHostState) },
-            modifier = Modifier.fillMaxSize()
-        ) { paddingValues ->
+        if (isSplashVisible) {
+            NexaSplashScreen(
+                onAnimationFinished = {
+                    isSplashVisible = false
+                }
+            )
+        } else {
+            Scaffold(
+                snackbarHost = { SnackbarHost(snackbarHostState) },
+                modifier = Modifier.fillMaxSize()
+            ) { paddingValues ->
             AnimatedContent(
                 targetState = when {
                     currentUser == null -> ScreenState.Auth
@@ -432,6 +442,9 @@ fun WpChatApp(
                                 onMarkMediaExpired = { msgId ->
                                     viewModel.markMediaExpired(msgId)
                                 },
+                                onUnsendMessage = { msgId ->
+                                    viewModel.unsendMessage(msgId)
+                                },
                                 onInputChange = { viewModel.onMessageInputChanged(it) },
                                 onAddReaction = { msgId, reaction ->
                                     viewModel.addReaction(msgId, reaction)
@@ -533,6 +546,7 @@ fun WpChatApp(
                     }
                 )
             }
+        }
         }
     }
 }

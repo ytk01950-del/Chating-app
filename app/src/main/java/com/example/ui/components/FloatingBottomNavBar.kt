@@ -94,19 +94,25 @@ fun FloatingBottomNavBar(
                     val isSelected = tab == selectedTab
 
                     val animatedBgColor by animateColorAsState(
-                        targetValue = if (isSelected) colors.accentOrangePill else Color.Transparent,
+                        targetValue = if (isSelected) {
+                            if (colors.isDark) Color(0xFF262626) else Color(0xFFEFEFEF)
+                        } else Color.Transparent,
                         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
                         label = "tab_bg_color"
                     )
 
                     val animatedBorderColor by animateColorAsState(
-                        targetValue = if (isSelected) colors.accentOrange.copy(alpha = 0.4f) else Color.Transparent,
+                        targetValue = if (isSelected) {
+                            if (colors.isDark) Color(0xFF363636) else Color(0xFFDBDBDB)
+                        } else Color.Transparent,
                         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
                         label = "tab_border_color"
                     )
 
                     val animatedContentColor by animateColorAsState(
-                        targetValue = if (isSelected) colors.accentOrange else colors.textSecondary,
+                        targetValue = if (isSelected) {
+                            if (colors.isDark) Color.White else Color(0xFF111111)
+                        } else colors.textMuted,
                         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
                         label = "tab_content_color"
                     )

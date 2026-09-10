@@ -1,5 +1,7 @@
 package com.example.ui.components
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
@@ -21,6 +23,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -35,6 +38,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ripple
@@ -155,9 +160,9 @@ fun AppSecondaryButton(
     enabled: Boolean = true,
     height: Dp = 46.dp,
     shape: Shape = AppButtonShape,
-    containerColor: Color = AppTheme.colors.surface,
-    borderColor: Color = AppTheme.colors.borderSubtle,
-    contentColor: Color = AppTheme.colors.textPrimary,
+    containerColor: Color = if (AppTheme.colors.isDark) Color(0xFF262626) else Color(0xFFEFEFEF),
+    borderColor: Color = if (AppTheme.colors.isDark) Color(0xFF262626) else Color(0xFFDBDBDB),
+    contentColor: Color = if (AppTheme.colors.isDark) Color(0xFFFFFFFF) else Color(0xFF111111),
     fontSize: TextUnit = 14.sp,
     testTag: String? = null
 ) {
@@ -470,13 +475,13 @@ fun AppFilterChip(
     showOnlineDot: Boolean = false
 ) {
     val colors = AppTheme.colors
-    val containerColor = if (selected) Color(0xFFFF6B00) else if (colors.isDark) Color(0xFF1E1E1E) else colors.surfaceVariant.copy(alpha = 0.7f)
-    val borderColor = if (selected) Color(0xFFFF6B00) else if (colors.isDark) Color(0xFF333333) else colors.borderSubtle
-    val contentColor = if (selected) Color.White else if (colors.isDark) Color.White else colors.textPrimary
+    val containerColor = if (selected) Color(0xFF2563EB) else if (colors.isDark) Color(0xFF262626) else Color(0xFFEFEFEF)
+    val borderColor = if (selected) Color(0xFF2563EB) else if (colors.isDark) Color(0xFF363636) else Color(0xFFDBDBDB)
+    val contentColor = if (selected) Color.White else if (colors.isDark) Color.White else Color(0xFF111111)
 
     Surface(
         onClick = onClick,
-        shape = AppPillShape,
+        shape = RoundedCornerShape(12.dp),
         color = containerColor,
         border = BorderStroke(1.dp, borderColor),
         modifier = modifier.height(34.dp)
@@ -585,5 +590,56 @@ fun AppChatListSkeleton(
                 AppSkeletonBox(modifier = Modifier.width(40.dp).height(10.dp))
             }
         }
+    }
+}
+
+@Composable
+fun instagramSwitchColors() = SwitchDefaults.colors(
+    checkedThumbColor = Color(0xFF121212),
+    checkedTrackColor = Color(0xFFEFEFEF),
+    uncheckedThumbColor = Color(0xFF8E8E8E),
+    uncheckedTrackColor = Color(0xFF363636),
+    checkedBorderColor = Color.Transparent,
+    uncheckedBorderColor = Color.Transparent
+)
+
+@Composable
+fun InstagramSwitch(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    testTag: String? = null
+) {
+    val trackColor = if (checked) Color(0xFFEFEFEF) else Color(0xFF363636)
+    val thumbColor = if (checked) Color(0xFF121212) else Color(0xFF8E8E8E)
+    val thumbOffset by animateDpAsState(
+        targetValue = if (checked) 20.dp else 2.dp,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "instagram_thumb_offset"
+    )
+
+    Box(
+        modifier = modifier
+            .then(if (testTag != null) Modifier.testTag(testTag) else Modifier)
+            .width(48.dp)
+            .height(28.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(trackColor)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                enabled = enabled
+            ) { onCheckedChange(!checked) }
+            .padding(vertical = 3.dp, horizontal = 2.dp),
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Box(
+            modifier = Modifier
+                .offset(x = thumbOffset)
+                .size(22.dp)
+                .clip(CircleShape)
+                .background(thumbColor)
+        )
     }
 }

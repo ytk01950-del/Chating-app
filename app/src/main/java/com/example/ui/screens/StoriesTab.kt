@@ -220,8 +220,8 @@ fun StoriesTab(
             // Info Privacy Banner
             item {
                 Surface(
-                    color = if (colors.isDark) Color(0xFF191D28) else Color(0xFFF1F5F9),
-                    border = BorderStroke(1.dp, if (colors.isDark) Color(0xFF283044) else Color(0xFFE2E8F0)),
+                    color = if (colors.isDark) Color(0xFF262626) else Color(0xFFF1F5F9),
+                    border = BorderStroke(1.dp, if (colors.isDark) Color(0xFF363636) else Color(0xFFE2E8F0)),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {

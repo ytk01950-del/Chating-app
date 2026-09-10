@@ -129,8 +129,8 @@ fun CallsTab(
                 // New Call Button
                 Surface(
                     shape = RoundedCornerShape(18.dp),
-                    color = colors.accentOrangePill,
-                    border = BorderStroke(1.dp, colors.accentOrange.copy(alpha = 0.4f)),
+                    color = if (colors.isDark) Color(0xFF262626) else Color(0xFFEFEFEF),
+                    border = BorderStroke(1.dp, if (colors.isDark) Color(0xFF363636) else Color(0xFFDBDBDB)),
                     modifier = Modifier
                         .clip(RoundedCornerShape(18.dp))
                         .clickable { showNewCallDialog = true }
@@ -143,13 +143,13 @@ fun CallsTab(
                         Icon(
                             imageVector = Icons.Default.Call,
                             contentDescription = "New Call",
-                            tint = colors.accentOrange,
+                            tint = if (colors.isDark) Color.White else Color(0xFF111111),
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = "+ New Call",
-                            color = colors.accentOrange,
+                            color = if (colors.isDark) Color.White else Color(0xFF111111),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -212,7 +212,7 @@ fun CallsTab(
                             Spacer(modifier = Modifier.height(20.dp))
                             Surface(
                                 shape = RoundedCornerShape(22.dp),
-                                color = colors.accentOrange,
+                                color = Color(0xFF2563EB),
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(22.dp))
                                     .clickable { showNewCallDialog = true }
@@ -285,12 +285,13 @@ fun CallsTab(
 
         AlertDialog(
             onDismissRequest = { showNewCallDialog = false },
+            shape = RoundedCornerShape(18.dp),
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Default.Call,
                         contentDescription = null,
-                        tint = colors.accentOrange,
+                        tint = Color(0xFF2563EB),
                         modifier = Modifier.size(24.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
@@ -308,7 +309,7 @@ fun CallsTab(
                         onValueChange = { userSearchQuery = it },
                         placeholder = { Text("Search contact to call...", color = colors.textMuted, fontSize = 13.sp) },
                         leadingIcon = {
-                            Icon(Icons.Default.Search, contentDescription = null, tint = colors.accentOrange)
+                            Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFF8E8E8E))
                         },
                         trailingIcon = {
                             if (userSearchQuery.isNotEmpty()) {
@@ -318,11 +319,14 @@ fun CallsTab(
                             }
                         },
                         singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = colors.textPrimary,
                             unfocusedTextColor = colors.textPrimary,
-                            focusedBorderColor = colors.accentOrange,
-                            unfocusedBorderColor = colors.borderSubtle
+                            focusedContainerColor = if (colors.isDark) Color(0xFF1E1E1E) else Color(0xFFF5F5F5),
+                            unfocusedContainerColor = if (colors.isDark) Color(0xFF1E1E1E) else Color(0xFFF5F5F5),
+                            focusedBorderColor = Color(0xFF2563EB),
+                            unfocusedBorderColor = if (colors.isDark) Color(0xFF363636) else Color(0xFFDBDBDB)
                         ),
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -402,12 +406,12 @@ fun CallsTab(
                                                 },
                                                 modifier = Modifier
                                                     .size(34.dp)
-                                                    .background(colors.accentOrangePill, CircleShape)
+                                                    .background(if (colors.isDark) Color(0xFF262626) else Color(0xFFDBEAFE), CircleShape)
                                             ) {
                                                 Icon(
                                                     imageVector = Icons.Default.Call,
                                                     contentDescription = "Voice Call",
-                                                    tint = colors.accentOrange,
+                                                    tint = Color(0xFF2563EB),
                                                     modifier = Modifier.size(16.dp)
                                                 )
                                             }
@@ -555,13 +559,13 @@ fun CallHistoryItemCard(
                     onClick = onVoiceCall,
                     modifier = Modifier
                         .size(38.dp)
-                        .background(colors.accentOrangePill, CircleShape)
+                        .background(if (colors.isDark) Color(0xFF262626) else Color(0xFFDBEAFE), CircleShape)
                         .testTag("call_item_voice_btn_${record.callId}")
                 ) {
                     Icon(
                         imageVector = Icons.Default.Call,
                         contentDescription = "Voice Call",
-                        tint = colors.accentOrange,
+                        tint = Color(0xFF2563EB),
                         modifier = Modifier.size(18.dp)
                     )
                 }

@@ -79,6 +79,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.User
 import com.example.ui.components.AvatarColorPairs
+import com.example.ui.components.InstagramSwitch
 import com.example.ui.components.UserAvatar
 import com.example.ui.theme.AppTheme
 import com.example.ui.theme.AppThemeMode
@@ -113,7 +114,7 @@ fun SettingsTab(
     var readReceiptsEnabled by remember { mutableStateOf(true) }
     var pushNotificationsEnabled by remember { mutableStateOf(true) }
     var soundVibrationEnabled by remember { mutableStateOf(true) }
-    var selectedDisappearingDefault by remember { mutableIntStateOf(0) } // 0 = Keep, 1 = View Once, 2 = View Twice
+    var selectedDisappearingDefault by remember { mutableIntStateOf(1) } // 1 = View Once, 2 = View Twice (default: View Once)
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -292,9 +293,9 @@ fun SettingsTab(
                                     .clip(RoundedCornerShape(12.dp))
                                     .clickable { showClaimUsernameDialog = true }
                                     .testTag("btn_claim_chat_id"),
-                                color = colors.accentOrangePill,
+                                color = if (colors.isDark) Color(0xFF262626) else Color(0xFFEFEFEF),
                                 shape = RoundedCornerShape(12.dp),
-                                border = BorderStroke(1.dp, colors.accentOrange.copy(alpha = 0.4f))
+                                border = BorderStroke(1.dp, if (colors.isDark) Color(0xFF363636) else Color(0xFFDBDBDB))
                             ) {
                                 Row(
                                     modifier = Modifier.fillMaxSize(),
@@ -304,15 +305,15 @@ fun SettingsTab(
                                     Icon(
                                         imageVector = Icons.Default.AlternateEmail,
                                         contentDescription = null,
-                                        tint = colors.accentOrange,
+                                        tint = if (colors.isDark) Color.White else Color(0xFF111111),
                                         modifier = Modifier.size(16.dp)
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
                                         text = "Claim @ChatID",
-                                        color = colors.accentOrange,
+                                        color = if (colors.isDark) Color.White else Color(0xFF111111),
                                         fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold
+                                        fontWeight = FontWeight.SemiBold
                                     )
                                 }
                             }
@@ -361,7 +362,7 @@ fun SettingsTab(
                                         AppThemeMode.SYSTEM -> Icons.Default.SettingsBrightness
                                     },
                                     contentDescription = "Theme",
-                                    tint = colors.accentOrange,
+                                    tint = colors.textPrimary,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -374,12 +375,20 @@ fun SettingsTab(
                                     color = colors.textPrimary
                                 )
                                 Text(
-                                    text = currentThemeMode.title,
+                                    text = if (colors.isDark) "Dark Mode Active" else "Light Mode Active",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = colors.textMuted
                                 )
                             }
                         }
+
+                        // Instagram Style Toggle Switch for Dark Mode
+                        InstagramSwitch(
+                            checked = colors.isDark,
+                            onCheckedChange = { isDark ->
+                                onThemeModeChange(if (isDark) AppThemeMode.DARK else AppThemeMode.LIGHT)
+                            }
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(14.dp))
@@ -398,15 +407,15 @@ fun SettingsTab(
                         options.forEach { (mode, label, icon) ->
                             val isSelected = currentThemeMode == mode
                             val animatedBg by animateColorAsState(
-                                targetValue = if (isSelected) Color(0xFFFF6B00) else colors.surfaceVariant,
+                                targetValue = if (isSelected) Color(0xFF2563EB) else if (colors.isDark) Color(0xFF262626) else Color(0xFFEFEFEF),
                                 label = "theme_btn_bg"
                             )
                             val animatedBorder by animateColorAsState(
-                                targetValue = if (isSelected) Color(0xFFFF6B00) else colors.borderSubtle,
+                                targetValue = if (isSelected) Color(0xFF2563EB) else if (colors.isDark) Color(0xFF363636) else Color(0xFFDBDBDB),
                                 label = "theme_btn_border"
                             )
                             val animatedContentColor by animateColorAsState(
-                                targetValue = if (isSelected) Color.White else colors.textPrimary,
+                                targetValue = if (isSelected) Color.White else if (colors.isDark) Color.White else Color(0xFF111111),
                                 label = "theme_btn_content"
                             )
 
@@ -555,7 +564,7 @@ fun SettingsTab(
                             Icon(
                                 imageVector = Icons.Default.CameraAlt,
                                 contentDescription = null,
-                                tint = colors.accentOrange,
+                                tint = if (colors.isDark) Color.White else Color(0xFF111111),
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
@@ -616,21 +625,21 @@ fun SettingsTab(
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        listOf("Keep in Chat", "View Once", "View Twice").forEachIndexed { index, title ->
-                            val isSelected = selectedDisappearingDefault == index
+                        listOf(Pair(1, "View Once"), Pair(2, "View Twice")).forEach { (modeValue, title) ->
+                            val isSelected = selectedDisappearingDefault == modeValue
                             Surface(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(38.dp)
+                                    .height(42.dp)
                                     .clip(RoundedCornerShape(10.dp))
-                                    .clickable { selectedDisappearingDefault = index },
+                                    .clickable { selectedDisappearingDefault = modeValue },
                                 shape = RoundedCornerShape(10.dp),
-                                color = if (isSelected) colors.accentOrangePill else colors.surfaceVariant,
+                                color = if (isSelected) Color(0xFF2563EB) else if (colors.isDark) Color(0xFF262626) else Color(0xFFEFEFEF),
                                 border = BorderStroke(
                                     1.dp,
-                                    if (isSelected) colors.accentOrange else Color.Transparent
+                                    if (isSelected) Color(0xFF2563EB) else if (colors.isDark) Color(0xFF363636) else Color(0xFFDBDBDB)
                                 )
                             ) {
                                 Box(
@@ -639,9 +648,9 @@ fun SettingsTab(
                                 ) {
                                     Text(
                                         text = title,
-                                        color = if (isSelected) colors.accentOrange else colors.textSecondary,
-                                        fontSize = 12.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                        color = if (isSelected) Color.White else if (colors.isDark) Color.White else Color(0xFF111111),
+                                        fontSize = 13.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                                     )
                                 }
                             }
@@ -786,6 +795,7 @@ fun SettingsTab(
     if (showSignOutDialog) {
         AlertDialog(
             onDismissRequest = { showSignOutDialog = false },
+            shape = RoundedCornerShape(18.dp),
             title = {
                 Text(
                     text = "Sign Out",
@@ -806,7 +816,8 @@ fun SettingsTab(
                         showSignOutDialog = false
                         onSignOut()
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                    shape = RoundedCornerShape(10.dp)
                 ) {
                     Text("Sign Out", color = Color.White, fontWeight = FontWeight.Bold)
                 }
@@ -829,12 +840,13 @@ fun SettingsTab(
 
         AlertDialog(
             onDismissRequest = { showClaimUsernameDialog = false },
+            shape = RoundedCornerShape(18.dp),
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Default.AlternateEmail,
                         contentDescription = null,
-                        tint = colors.accentOrange,
+                        tint = Color(0xFF2563EB),
                         modifier = Modifier.size(24.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
@@ -863,14 +875,14 @@ fun SettingsTab(
                             availabilityError = null
                         },
                         placeholder = { Text("e.g. alex_rivera", color = colors.textMuted) },
-                        prefix = { Text("@", color = colors.accentOrange, fontWeight = FontWeight.Bold) },
+                        prefix = { Text("@", color = Color(0xFF2563EB), fontWeight = FontWeight.Bold) },
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = colors.textPrimary,
                             unfocusedTextColor = colors.textPrimary,
                             focusedContainerColor = colors.surfaceVariant,
                             unfocusedContainerColor = colors.surfaceVariant,
-                            focusedBorderColor = colors.accentOrange,
+                            focusedBorderColor = Color(0xFF2563EB),
                             unfocusedBorderColor = colors.borderSubtle
                         ),
                         modifier = Modifier.fillMaxWidth()
@@ -919,7 +931,8 @@ fun SettingsTab(
                             }
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = colors.accentOrange),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
+                    shape = RoundedCornerShape(10.dp),
                     enabled = usernameInput.length >= 3 && !isCheckingAvailability
                 ) {
                     if (isCheckingAvailability) {
@@ -948,6 +961,7 @@ fun SettingsTab(
 
         AlertDialog(
             onDismissRequest = { showEditProfileDialog = false },
+            shape = RoundedCornerShape(18.dp),
             title = {
                 Text(
                     text = "Edit Profile Info",
@@ -965,7 +979,7 @@ fun SettingsTab(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = colors.textPrimary,
                             unfocusedTextColor = colors.textPrimary,
-                            focusedBorderColor = colors.accentOrange,
+                            focusedBorderColor = Color(0xFF2563EB),
                             unfocusedBorderColor = colors.borderSubtle
                         ),
                         modifier = Modifier.fillMaxWidth()
@@ -979,7 +993,7 @@ fun SettingsTab(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = colors.textPrimary,
                             unfocusedTextColor = colors.textPrimary,
-                            focusedBorderColor = colors.accentOrange,
+                            focusedBorderColor = Color(0xFF2563EB),
                             unfocusedBorderColor = colors.borderSubtle
                         ),
                         modifier = Modifier.fillMaxWidth()
@@ -993,7 +1007,7 @@ fun SettingsTab(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = colors.textPrimary,
                             unfocusedTextColor = colors.textPrimary,
-                            focusedBorderColor = colors.accentOrange,
+                            focusedBorderColor = Color(0xFF2563EB),
                             unfocusedBorderColor = colors.borderSubtle
                         ),
                         modifier = Modifier.fillMaxWidth()
@@ -1019,8 +1033,8 @@ fun SettingsTab(
                                     .height(36.dp)
                                     .clip(RoundedCornerShape(8.dp))
                                     .clickable { editGender = gender },
-                                color = if (isSelected) colors.accentOrangePill else colors.surfaceVariant,
-                                border = BorderStroke(1.dp, if (isSelected) colors.accentOrange else Color.Transparent),
+                                color = if (isSelected) Color(0xFF2563EB) else if (colors.isDark) Color(0xFF262626) else Color(0xFFEFEFEF),
+                                border = BorderStroke(1.dp, if (isSelected) Color(0xFF2563EB) else if (colors.isDark) Color(0xFF363636) else Color(0xFFDBDBDB)),
                                 shape = RoundedCornerShape(8.dp)
                             ) {
                                 Box(
@@ -1029,7 +1043,7 @@ fun SettingsTab(
                                 ) {
                                     Text(
                                         text = gender,
-                                        color = if (isSelected) colors.accentOrange else colors.textSecondary,
+                                        color = if (isSelected) Color.White else if (colors.isDark) Color.White else Color(0xFF111111),
                                         fontSize = 12.sp,
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                     )
@@ -1048,7 +1062,8 @@ fun SettingsTab(
                             Toast.makeText(context, "Profile updated successfully!", Toast.LENGTH_SHORT).show()
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = colors.accentOrange),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
+                    shape = RoundedCornerShape(10.dp),
                     enabled = editName.isNotBlank()
                 ) {
                     Text("Save Changes", color = Color.White, fontWeight = FontWeight.Bold)
@@ -1093,7 +1108,7 @@ private fun SettingsSwitchRow(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = colors.accentOrange,
+                    tint = if (checked) Color(0xFF2563EB) else colors.textMuted,
                     modifier = Modifier.size(18.dp)
                 )
             }
@@ -1118,15 +1133,9 @@ private fun SettingsSwitchRow(
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        Switch(
+        InstagramSwitch(
             checked = checked,
-            onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.White,
-                checkedTrackColor = colors.accentOrange,
-                uncheckedThumbColor = colors.textMuted,
-                uncheckedTrackColor = colors.surfaceVariant
-            )
+            onCheckedChange = onCheckedChange
         )
     }
 }

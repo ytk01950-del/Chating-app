@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "WP CHAT"
+rootProject.name = "NexaChat"
 
 include(":app")
