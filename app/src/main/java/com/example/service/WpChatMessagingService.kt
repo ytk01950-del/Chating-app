@@ -20,17 +20,51 @@ class WpChatMessagingService : FirebaseMessagingService() {
 
     override fun onMessageReceived(remoteMessage: RemoteMessage) {
         super.onMessageReceived(remoteMessage)
-        Log.d(tag, "From: ${remoteMessage.from}")
+        Log.d(tag, "From: ${remoteMessage.from}, data: ${remoteMessage.data}")
 
-        // Read payload from data or notification
         val data = remoteMessage.data
+        val notifType = data["type"] ?: ""
+
+        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+
+        if (notifType == "call" || data.containsKey("callId")) {
+            val callId = data["callId"] ?: ""
+            val callerId = data["callerId"] ?: data["senderId"] ?: ""
+            val callerName = data["callerName"] ?: data["senderName"] ?: "WP CHAT User"
+            val callType = data["callType"] ?: "AUDIO"
+
+            if (callerId.isNotBlank() && callerId == currentUserId) {
+                return
+            }
+
+            // Update call status to RINGING in Firebase RTDB so caller sees 'Ringing...'
+            if (callId.isNotBlank()) {
+                try {
+                    val db = FirebaseDatabase.getInstance(databaseUrl)
+                    db.getReference("calls").child(callId).child("status").setValue("RINGING")
+                    Log.d(tag, "Call $callId status updated to RINGING on receiver FCM receipt")
+                } catch (e: Exception) {
+                    Log.w(tag, "Failed to update call status to RINGING: ${e.message}")
+                }
+            }
+
+            // Show incoming call notification banner with system ringtone
+            WpChatNotificationHelper.showIncomingCallNotification(
+                context = applicationContext,
+                callId = callId,
+                callerId = callerId,
+                callerName = callerName,
+                callType = callType
+            )
+            return
+        }
+
+        // Read payload for chat message
         val senderId = data["senderId"] ?: data["fromUserId"] ?: ""
         val senderName = data["senderName"] ?: remoteMessage.notification?.title ?: "WP CHAT"
         val chatId = data["chatId"] ?: ""
         val messageId = data["messageId"] ?: ""
         val text = data["text"] ?: data["message"] ?: remoteMessage.notification?.body ?: "New message received"
-
-        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
 
         // Do not notify sender about their own message
         if (senderId.isNotBlank() && senderId == currentUserId) {

@@ -72,7 +72,10 @@ class CallSignalingService(
                         if (session != null && session.receiverId == currentUserId &&
                             (session.status == CallStatus.RINGING.name || session.status == CallStatus.OUTGOING.name)
                         ) {
-                            trySend(session)
+                            if (session.status == CallStatus.OUTGOING.name) {
+                                sessionRef?.child("status")?.setValue(CallStatus.RINGING.name)
+                            }
+                            trySend(session.copy(status = CallStatus.RINGING.name))
                         } else {
                             trySend(null)
                         }
@@ -152,7 +155,7 @@ class CallSignalingService(
                 receiverPhotoUrl = receiver.photoUrl,
                 receiverAvatarId = receiver.avatarId,
                 callType = callType.name,
-                status = CallStatus.RINGING.name,
+                status = CallStatus.OUTGOING.name,
                 channelName = channelName,
                 timestamp = now,
                 startedAt = 0L,

@@ -32,10 +32,18 @@ data class ChatMessage(
     val isTemporary: Boolean = false,
     val viewedAt: Long = 0L,
     val expiresAt: Long = 0L,
-    val isExpired: Boolean = false
+    val isExpired: Boolean = false,
+    val viewLimit: Int = 0, // 0 = standard/keep, 1 = view once, 2 = view twice
+    val currentViews: Int = 0,
+    val allowDownload: Boolean = false
 ) {
+    fun isDisappearing(): Boolean = viewLimit > 0
+
+    fun remainingViews(): Int = (viewLimit - currentViews).coerceAtLeast(0)
+
     fun isMediaExpired(): Boolean {
         if (isExpired) return true
+        if (viewLimit > 0 && currentViews >= viewLimit) return true
         if (isTemporary && expiresAt > 0L && System.currentTimeMillis() >= expiresAt) return true
         return false
     }

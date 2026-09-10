@@ -40,14 +40,7 @@ import androidx.compose.ui.unit.sp
 import com.example.model.Story
 import com.example.model.User
 import com.example.model.UserStoryGroup
-import com.example.ui.theme.AccentBlue
-import com.example.ui.theme.AccentBlueDark
-import com.example.ui.theme.DarkBorderSubtle
-import com.example.ui.theme.DarkSurface
-import com.example.ui.theme.OnlineGreen
-import com.example.ui.theme.TextMuted
-import com.example.ui.theme.TextPrimary
-import com.example.ui.theme.TextSecondary
+import com.example.ui.theme.AppTheme
 
 // Gradient for unread active stories (Instagram / Snapchat gradient style)
 val StoryActiveGradient = Brush.sweepGradient(
@@ -118,10 +111,12 @@ fun StoryTray(
     onViewUserStories: (User, List<Story>) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = AppTheme.colors
+
     Surface(
-        color = DarkSurface,
+        color = colors.surface,
         modifier = modifier.fillMaxWidth(),
-        border = BorderStroke(1.dp, DarkBorderSubtle)
+        border = BorderStroke(1.dp, colors.borderSubtle)
     ) {
         LazyRow(
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
@@ -164,8 +159,8 @@ fun StoryTray(
                             modifier = Modifier
                                 .size(20.dp)
                                 .clip(CircleShape)
-                                .background(AccentBlue)
-                                .border(2.dp, DarkSurface, CircleShape)
+                                .background(colors.accentOrange)
+                                .border(2.dp, colors.surface, CircleShape)
                                 .clickable { onOpenAddStory() },
                             contentAlignment = Alignment.Center
                         ) {
@@ -182,9 +177,9 @@ fun StoryTray(
 
                     Text(
                         text = if (hasMyStories) "Your Story" else "Add Story",
-                        color = if (hasMyStories) TextPrimary else TextSecondary,
+                        color = if (colors.isDark) Color.White else colors.textPrimary,
                         fontSize = 11.sp,
-                        fontWeight = if (hasMyStories) FontWeight.SemiBold else FontWeight.Normal,
+                        fontWeight = if (hasMyStories) FontWeight.Bold else FontWeight.Medium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         textAlign = TextAlign.Center
@@ -221,9 +216,9 @@ fun StoryTray(
 
                     Text(
                         text = group.user.displayName.substringBefore(" "),
-                        color = if (group.hasUnseenStories) TextPrimary else TextMuted,
+                        color = if (colors.isDark) Color.White else colors.textPrimary,
                         fontSize = 11.sp,
-                        fontWeight = if (group.hasUnseenStories) FontWeight.SemiBold else FontWeight.Normal,
+                        fontWeight = if (group.hasUnseenStories) FontWeight.Bold else FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         textAlign = TextAlign.Center

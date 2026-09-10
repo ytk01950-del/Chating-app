@@ -638,6 +638,8 @@ class ChatViewModel(
         fileUri: Uri,
         forcedType: MessageType? = null,
         caption: String = "",
+        viewLimit: Int = 0,
+        allowDownload: Boolean = true,
         context: Context
     ) {
         val user = _currentUser.value ?: return
@@ -657,6 +659,8 @@ class ChatViewModel(
                 fileUri = fileUri,
                 forcedType = forcedType,
                 caption = caption,
+                viewLimit = viewLimit,
+                allowDownload = allowDownload,
                 context = context,
                 onProgress = { progress ->
                     _mediaUploadProgress.value = progress

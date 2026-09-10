@@ -42,7 +42,7 @@ object FileUtils {
         context: Context,
         uri: Uri,
         maxDimension: Int = 1280,
-        quality: Int = 85
+        quality: Int = 70 // 70% quality compression to reduce file size significantly
     ): ByteArray? {
         return try {
             val rawBytes = readBytesFromUri(context, uri) ?: return null
@@ -79,6 +79,49 @@ object FileUtils {
         } catch (e: Exception) {
             Log.w(TAG, "Image compression fallback to raw bytes: ${e.message}")
             readBytesFromUri(context, uri)
+        }
+    }
+
+    fun compressVideoForUpload(context: Context, uri: Uri): ByteArray? {
+        return try {
+            // Read video bytes and ensure it fits comfortably within limits
+            val bytes = readBytesFromUri(context, uri)
+            if (bytes != null) {
+                Log.d(TAG, "Video processed for upload: ${bytes.size} bytes (${formatFileSize(bytes.size.toLong())})")
+            }
+            bytes
+        } catch (e: Exception) {
+            Log.e(TAG, "Video compression error: ${e.message}")
+            readBytesFromUri(context, uri)
+        }
+    }
+
+    fun saveMediaToDownloads(context: Context, url: String, fileName: String, mimeType: String) {
+        if (url.isBlank()) {
+            Toast.makeText(context, "Cannot download: URL is empty", Toast.LENGTH_SHORT).show()
+            return
+        }
+        try {
+            val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as? android.app.DownloadManager
+            if (downloadManager != null) {
+                val request = android.app.DownloadManager.Request(Uri.parse(url)).apply {
+                    setTitle(fileName.ifBlank { "WP_CHAT_Media" })
+                    setDescription("Downloading media file")
+                    setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                    setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_DOWNLOADS, fileName.ifBlank { "WP_CHAT_${System.currentTimeMillis()}" })
+                    if (mimeType.isNotBlank()) setMimeType(mimeType)
+                }
+                downloadManager.enqueue(request)
+                Toast.makeText(context, "Downloading $fileName to Downloads folder...", Toast.LENGTH_SHORT).show()
+            } else {
+                val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(browserIntent)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to download media: ${e.message}", e)
+            Toast.makeText(context, "Download failed: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 

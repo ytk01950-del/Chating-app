@@ -783,15 +783,33 @@ class FirebaseChatRepository {
         try {
             val msgRef = database.getReference("chats").child(chatId).child("messages").child(messageId)
             val snap = msgRef.get().await()
-            val viewedAt = snap.child("viewedAt").getValue(Long::class.java) ?: 0L
-            if (viewedAt == 0L) {
-                val now = System.currentTimeMillis()
-                val expiresAt = now + 60_000L // 1 minute countdown
-                val updates = mapOf<String, Any>(
-                    "viewedAt" to now,
-                    "expiresAt" to expiresAt
-                )
-                msgRef.updateChildren(updates).await()
+            val currentViews = snap.child("currentViews").getValue(Int::class.java) ?: 0
+            val viewLimit = snap.child("viewLimit").getValue(Int::class.java) ?: 0
+            val fileUrl = snap.child("fileUrl").getValue(String::class.java).orEmpty()
+            val newViews = currentViews + 1
+            val now = System.currentTimeMillis()
+
+            val updates = mutableMapOf<String, Any>(
+                "currentViews" to newViews,
+                "viewedAt" to now
+            )
+
+            val shouldExpire = (viewLimit > 0 && newViews >= viewLimit)
+            if (shouldExpire) {
+                updates["isExpired"] = true
+                updates["fileUrl"] = "" // Clear file URL to purge from database record
+            }
+
+            msgRef.updateChildren(updates).await()
+
+            // Purge file from Supabase storage when view limit is reached
+            if (shouldExpire && fileUrl.isNotBlank()) {
+                try {
+                    SupabaseStorageService.deleteFileByUrl(fileUrl)
+                    Log.d(tag, "Disappearing media purged from Supabase Storage: $fileUrl")
+                } catch (delErr: Exception) {
+                    Log.w(tag, "Failed to delete disappearing media from Supabase: ${delErr.message}")
+                }
             }
         } catch (e: Exception) {
             Log.w(tag, "markTemporaryMediaViewed error: ${e.message}")
@@ -800,13 +818,24 @@ class FirebaseChatRepository {
 
     suspend fun markMediaExpired(chatId: String, messageId: String) {
         try {
-            database.getReference("chats")
-                .child(chatId)
-                .child("messages")
-                .child(messageId)
-                .child("isExpired")
-                .setValue(true)
-                .await()
+            val msgRef = database.getReference("chats").child(chatId).child("messages").child(messageId)
+            val snap = msgRef.get().await()
+            val fileUrl = snap.child("fileUrl").getValue(String::class.java).orEmpty()
+
+            val updates = mapOf<String, Any>(
+                "isExpired" to true,
+                "fileUrl" to ""
+            )
+            msgRef.updateChildren(updates).await()
+
+            if (fileUrl.isNotBlank()) {
+                try {
+                    SupabaseStorageService.deleteFileByUrl(fileUrl)
+                    Log.d(tag, "Expired media deleted from Supabase Storage: $fileUrl")
+                } catch (e: Exception) {
+                    Log.w(tag, "Storage delete error: ${e.message}")
+                }
+            }
         } catch (e: Exception) {
             Log.w(tag, "markMediaExpired error: ${e.message}")
         }
@@ -1274,6 +1303,8 @@ class FirebaseChatRepository {
         fileUri: Uri,
         forcedType: MessageType? = null,
         caption: String = "",
+        viewLimit: Int = 0,
+        allowDownload: Boolean = true,
         context: Context,
         onProgress: (Float) -> Unit = {}
     ): Result<ChatMessage> {
@@ -1288,11 +1319,19 @@ class FirebaseChatRepository {
                 )
             }
 
-            val fileBytes = if (meta.messageType == MessageType.IMAGE) {
-                FileUtils.compressImageForUpload(context, fileUri, maxDimension = 1920, quality = 85)
-                    ?: FileUtils.readBytesFromUri(context, fileUri)
-            } else {
-                FileUtils.readBytesFromUri(context, fileUri)
+            // Client-side auto-compression before uploading to chat-media bucket
+            val fileBytes = when (meta.messageType) {
+                MessageType.IMAGE -> {
+                    FileUtils.compressImageForUpload(context, fileUri, maxDimension = 1920, quality = 70)
+                        ?: FileUtils.readBytesFromUri(context, fileUri)
+                }
+                MessageType.VIDEO -> {
+                    FileUtils.compressVideoForUpload(context, fileUri)
+                        ?: FileUtils.readBytesFromUri(context, fileUri)
+                }
+                else -> {
+                    FileUtils.readBytesFromUri(context, fileUri)
+                }
             } ?: return Result.failure(IllegalStateException("Could not read attachment file"))
 
             if (fileBytes.isEmpty()) {
@@ -1323,7 +1362,7 @@ class FirebaseChatRepository {
                 onSuccess = { downloadUrl ->
                     Log.d(tag, "Chat media uploaded to Supabase. Download URL: $downloadUrl")
 
-                    val isTempMedia = (meta.messageType == MessageType.IMAGE || meta.messageType == MessageType.VIDEO)
+                    val isDisappearing = viewLimit > 0
                     val message = ChatMessage(
                         id = msgId,
                         senderId = sender.id,
@@ -1338,7 +1377,10 @@ class FirebaseChatRepository {
                         fileUrl = downloadUrl,
                         mimeType = meta.mimeType,
                         fileSize = fileBytes.size.toLong(),
-                        isTemporary = isTempMedia
+                        isTemporary = isDisappearing,
+                        viewLimit = viewLimit,
+                        currentViews = 0,
+                        allowDownload = allowDownload
                     )
 
                     // 1. Write message to Firebase database

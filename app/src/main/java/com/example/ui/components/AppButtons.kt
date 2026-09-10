@@ -1,13 +1,11 @@
 package com.example.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -19,7 +17,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -35,9 +32,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -45,14 +39,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -64,30 +56,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.theme.AccentBlue
-import com.example.ui.theme.AccentBlueDark
-import com.example.ui.theme.AccentBlueNavy
-import com.example.ui.theme.DarkBg
-import com.example.ui.theme.DarkBorder
-import com.example.ui.theme.DarkBorderSubtle
-import com.example.ui.theme.DarkSurface
-import com.example.ui.theme.DarkSurfaceVariant
+import com.example.ui.theme.AppTheme
 import com.example.ui.theme.OnlineGreen
-import com.example.ui.theme.TextMuted
-import com.example.ui.theme.TextPrimary
-import com.example.ui.theme.TextSecondary
 
-/**
- * Standard button corner radius across the app.
- */
 val AppButtonShape = RoundedCornerShape(14.dp)
 val AppButtonSmallShape = RoundedCornerShape(10.dp)
 val AppPillShape = RoundedCornerShape(24.dp)
 
-/**
- * Primary prominent action button with sleek gradient/accent, subtle spring press,
- * and built-in loading state.
- */
 @Composable
 fun AppPrimaryButton(
     text: String,
@@ -98,11 +73,12 @@ fun AppPrimaryButton(
     enabled: Boolean = true,
     height: Dp = 50.dp,
     shape: Shape = AppButtonShape,
-    containerColor: Color = AccentBlue,
-    contentColor: Color = AccentBlueNavy,
+    containerColor: Color = AppTheme.colors.accentOrange,
+    contentColor: Color = Color.White,
     fontSize: TextUnit = 15.sp,
     testTag: String? = null
 ) {
+    val colors = AppTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val animatedScale by animateFloatAsState(
@@ -124,8 +100,8 @@ fun AppPrimaryButton(
         colors = ButtonDefaults.buttonColors(
             containerColor = containerColor,
             contentColor = contentColor,
-            disabledContainerColor = DarkSurfaceVariant,
-            disabledContentColor = TextSecondary.copy(alpha = 0.5f)
+            disabledContainerColor = colors.surfaceVariant,
+            disabledContentColor = colors.textDisabled
         ),
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
         elevation = ButtonDefaults.buttonElevation(
@@ -162,17 +138,13 @@ fun AppPrimaryButton(
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 0.2.sp
                 ),
-                color = if (enabled) contentColor else TextSecondary.copy(alpha = 0.6f),
+                color = if (enabled) contentColor else colors.textDisabled,
                 textAlign = TextAlign.Center
             )
         }
     }
 }
 
-/**
- * Secondary / Outlined action button with subtle dark container, crisp 1dp border,
- * and high readability.
- */
 @Composable
 fun AppSecondaryButton(
     text: String,
@@ -183,12 +155,13 @@ fun AppSecondaryButton(
     enabled: Boolean = true,
     height: Dp = 46.dp,
     shape: Shape = AppButtonShape,
-    containerColor: Color = DarkSurface,
-    borderColor: Color = DarkBorderSubtle,
-    contentColor: Color = TextPrimary,
+    containerColor: Color = AppTheme.colors.surface,
+    borderColor: Color = AppTheme.colors.borderSubtle,
+    contentColor: Color = AppTheme.colors.textPrimary,
     fontSize: TextUnit = 14.sp,
     testTag: String? = null
 ) {
+    val colors = AppTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val animatedScale by animateFloatAsState(
@@ -207,12 +180,12 @@ fun AppSecondaryButton(
             .then(if (testTag != null) Modifier.testTag(testTag) else Modifier),
         shape = shape,
         interactionSource = interactionSource,
-        border = BorderStroke(1.dp, if (enabled) borderColor else DarkBorder.copy(alpha = 0.5f)),
+        border = BorderStroke(1.dp, if (enabled) borderColor else colors.border.copy(alpha = 0.5f)),
         colors = ButtonDefaults.outlinedButtonColors(
             containerColor = containerColor,
             contentColor = contentColor,
-            disabledContainerColor = DarkSurface.copy(alpha = 0.5f),
-            disabledContentColor = TextSecondary.copy(alpha = 0.4f)
+            disabledContainerColor = colors.surface.copy(alpha = 0.5f),
+            disabledContentColor = colors.textDisabled
         ),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
     ) {
@@ -232,7 +205,7 @@ fun AppSecondaryButton(
                     imageVector = icon,
                     contentDescription = null,
                     modifier = Modifier.size(16.dp),
-                    tint = if (enabled) contentColor else TextSecondary.copy(alpha = 0.4f)
+                    tint = if (enabled) contentColor else colors.textDisabled
                 )
                 Spacer(modifier = Modifier.width(6.dp))
             }
@@ -243,16 +216,13 @@ fun AppSecondaryButton(
                     fontSize = fontSize,
                     fontWeight = FontWeight.SemiBold
                 ),
-                color = if (enabled) contentColor else TextSecondary.copy(alpha = 0.4f),
+                color = if (enabled) contentColor else colors.textDisabled,
                 textAlign = TextAlign.Center
             )
         }
     }
 }
 
-/**
- * Destructive action button (Delete, Sign Out, Remove) with warning palette.
- */
 @Composable
 fun AppDestructiveButton(
     text: String,
@@ -266,8 +236,8 @@ fun AppDestructiveButton(
     shape: Shape = AppButtonShape,
     testTag: String? = null
 ) {
-    val errorRed = Color(0xFFE53935)
-    val errorRedContainer = Color(0xFF3E1215)
+    val errorRed = Color(0xFFEF4444)
+    val errorRedContainer = Color(0xFF3F1618)
     val errorRedBorder = Color(0xFF8C1D24)
     val errorText = Color(0xFFFFB4AB)
 
@@ -331,25 +301,23 @@ fun AppDestructiveButton(
     }
 }
 
-/**
- * Modern circular or rounded-square Action Icon Button with crisp background and ripple.
- */
 @Composable
 fun AppIconButton(
     icon: ImageVector,
     contentDescription: String?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    tint: Color = TextPrimary,
-    containerColor: Color = DarkSurfaceVariant.copy(alpha = 0.8f),
+    tint: Color = AppTheme.colors.textPrimary,
+    containerColor: Color = AppTheme.colors.surfaceVariant.copy(alpha = 0.8f),
     backgroundColor: Color = containerColor,
-    borderColor: Color = DarkBorderSubtle,
+    borderColor: Color = AppTheme.colors.borderSubtle,
     size: Dp = 42.dp,
     iconSize: Dp = 20.dp,
     shape: Shape = CircleShape,
     enabled: Boolean = true,
     testTag: String? = null
 ) {
+    val colors = AppTheme.colors
     val effectiveBg = if (backgroundColor != containerColor) backgroundColor else containerColor
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -367,7 +335,7 @@ fun AppIconButton(
             .background(if (enabled) effectiveBg else effectiveBg.copy(alpha = 0.4f))
             .border(
                 1.dp,
-                if (effectiveBg == Color.Transparent) Color.Transparent else if (enabled) borderColor else DarkBorder.copy(alpha = 0.4f),
+                if (effectiveBg == Color.Transparent) Color.Transparent else if (enabled) borderColor else colors.border.copy(alpha = 0.4f),
                 shape
             )
             .clickable(
@@ -383,15 +351,12 @@ fun AppIconButton(
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
-            tint = if (enabled) tint else TextSecondary.copy(alpha = 0.4f),
+            tint = if (enabled) tint else colors.textDisabled,
             modifier = Modifier.size(iconSize)
         )
     }
 }
 
-/**
- * Chat Composer animated send button with state transitions and active glow.
- */
 @Composable
 fun AppSendButton(
     onClick: () -> Unit,
@@ -401,6 +366,7 @@ fun AppSendButton(
     size: Dp = 42.dp,
     testTag: String = "send_message_button"
 ) {
+    val colors = AppTheme.colors
     val isSendEnabled = canSend && enabled
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -410,8 +376,8 @@ fun AppSendButton(
         label = "sendScale"
     )
 
-    val bgColor = if (isSendEnabled) AccentBlue else DarkSurfaceVariant
-    val iconTint = if (isSendEnabled) AccentBlueNavy else TextSecondary.copy(alpha = 0.6f)
+    val bgColor = if (isSendEnabled) colors.accentOrange else colors.surfaceVariant
+    val iconTint = if (isSendEnabled) Color.White else colors.textMuted
 
     Box(
         modifier = modifier
@@ -419,11 +385,11 @@ fun AppSendButton(
             .scale(scale)
             .clip(CircleShape)
             .background(bgColor)
-            .border(1.dp, if (isSendEnabled) AccentBlue else DarkBorderSubtle, CircleShape)
+            .border(1.dp, if (isSendEnabled) colors.accentOrange else colors.borderSubtle, CircleShape)
             .clickable(
                 enabled = isSendEnabled,
                 interactionSource = interactionSource,
-                indication = ripple(bounded = true, color = AccentBlueNavy),
+                indication = ripple(bounded = true, color = Color.White),
                 role = Role.Button,
                 onClick = onClick
             )
@@ -439,9 +405,6 @@ fun AppSendButton(
     }
 }
 
-/**
- * Modern attachment bottom sheet grid item with colored circular badge and label.
- */
 @Composable
 fun AppAttachmentGridItem(
     icon: ImageVector,
@@ -450,6 +413,7 @@ fun AppAttachmentGridItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = AppTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
@@ -488,7 +452,7 @@ fun AppAttachmentGridItem(
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = label,
-            color = TextPrimary,
+            color = colors.textPrimary,
             fontSize = 12.sp,
             fontWeight = FontWeight.Medium,
             textAlign = TextAlign.Center
@@ -496,9 +460,6 @@ fun AppAttachmentGridItem(
     }
 }
 
-/**
- * Sleek filter pill chip with active state indicator and rounded styling.
- */
 @Composable
 fun AppFilterChip(
     selected: Boolean,
@@ -508,9 +469,10 @@ fun AppFilterChip(
     badgeCount: Int? = null,
     showOnlineDot: Boolean = false
 ) {
-    val containerColor = if (selected) AccentBlue.copy(alpha = 0.16f) else DarkSurface
-    val borderColor = if (selected) AccentBlue else DarkBorderSubtle
-    val contentColor = if (selected) AccentBlue else TextSecondary
+    val colors = AppTheme.colors
+    val containerColor = if (selected) Color(0xFFFF6B00) else if (colors.isDark) Color(0xFF1E1E1E) else colors.surfaceVariant.copy(alpha = 0.7f)
+    val borderColor = if (selected) Color(0xFFFF6B00) else if (colors.isDark) Color(0xFF333333) else colors.borderSubtle
+    val contentColor = if (selected) Color.White else if (colors.isDark) Color.White else colors.textPrimary
 
     Surface(
         onClick = onClick,
@@ -536,32 +498,29 @@ fun AppFilterChip(
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium.copy(
-                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold
                 ),
                 color = contentColor
             )
-            if (badgeCount != null) {
+            if (badgeCount != null && badgeCount > 0) {
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     text = "($badgeCount)",
                     style = MaterialTheme.typography.labelSmall,
-                    color = contentColor.copy(alpha = 0.8f)
+                    color = if (selected) Color.White.copy(alpha = 0.9f) else if (colors.isDark) Color(0xFFE0E0E0) else colors.textMuted
                 )
             }
         }
     }
 }
 
-/**
- * Modern Ghost / Borderless text button with clean hover/press feedback.
- */
 @Composable
 fun AppGhostButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
-    contentColor: Color = AccentBlue,
+    contentColor: Color = AppTheme.colors.accentOrange,
     fontSize: TextUnit = 14.sp
 ) {
     TextButton(
@@ -578,20 +537,18 @@ fun AppGhostButton(
     }
 }
 
-/**
- * Animated Shimmer skeleton loader box for smooth loading states.
- */
 @Composable
 fun AppSkeletonBox(
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(8.dp)
 ) {
-    val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "shimmer")
+    val colors = AppTheme.colors
+    val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
     val alpha by infiniteTransition.animateFloat(
         initialValue = 0.3f,
         targetValue = 0.85f,
-        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-            animation = androidx.compose.animation.core.tween(900),
+        animationSpec = infiniteRepeatable(
+            animation = tween(900),
             repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
         ),
         label = "shimmerAlpha"
@@ -600,13 +557,10 @@ fun AppSkeletonBox(
     Box(
         modifier = modifier
             .clip(shape)
-            .background(DarkSurfaceVariant.copy(alpha = alpha))
+            .background(colors.surfaceVariant.copy(alpha = alpha))
     )
 }
 
-/**
- * Shimmer loader for chat conversations list.
- */
 @Composable
 fun AppChatListSkeleton(
     count: Int = 5,
@@ -633,4 +587,3 @@ fun AppChatListSkeleton(
         }
     }
 }
-

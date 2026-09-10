@@ -45,7 +45,9 @@ import com.example.ui.screens.IncomingCallDialog
 import com.example.ui.screens.SocialProfileScreen
 import com.example.ui.screens.StoryViewerDialog
 import com.example.ui.screens.UserDirectoryScreen
+import com.example.ui.theme.AppThemeMode
 import com.example.ui.theme.MyApplicationTheme
+import com.example.ui.theme.ThemePreferences
 import com.example.util.WpChatNotificationHelper
 import com.example.viewmodel.ChatViewModel
 
@@ -64,9 +66,24 @@ class MainActivity : ComponentActivity() {
 
         handleNotificationIntent(intent)
 
+        val themePreferences = ThemePreferences(applicationContext)
+
         setContent {
-            MyApplicationTheme {
-                WpChatApp(viewModel = chatViewModel)
+            val currentThemeMode by themePreferences.themeMode.collectAsStateWithLifecycle()
+
+            MyApplicationTheme(
+                themeMode = currentThemeMode,
+                onThemeModeChange = { newMode ->
+                    themePreferences.setThemeMode(newMode)
+                }
+            ) {
+                WpChatApp(
+                    viewModel = chatViewModel,
+                    currentThemeMode = currentThemeMode,
+                    onThemeModeChange = { newMode ->
+                        themePreferences.setThemeMode(newMode)
+                    }
+                )
             }
         }
     }
@@ -87,7 +104,9 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun WpChatApp(
-    viewModel: ChatViewModel = viewModel()
+    viewModel: ChatViewModel = viewModel(),
+    currentThemeMode: AppThemeMode = AppThemeMode.SYSTEM,
+    onThemeModeChange: (AppThemeMode) -> Unit = {}
 ) {
     val context = LocalContext.current
     val authUiState by viewModel.authUiState.collectAsStateWithLifecycle()
@@ -315,6 +334,21 @@ fun WpChatApp(
                                 onClearChatIdSearch = { viewModel.clearSearchUserResult() },
                                 onSelectUser = { viewModel.openChatWith(it) },
                                 onOpenProfile = { viewModel.openCurrentProfile() },
+                                onUploadProfilePhoto = { uri ->
+                                    viewModel.uploadProfilePhoto(uri, context)
+                                },
+                                onUpdateProfile = { name, bio, status, avatarId, gender ->
+                                    viewModel.updateProfileDetails(name, bio, status, avatarId, gender)
+                                },
+                                onClaimUsername = { username, callback ->
+                                    viewModel.claimUsernameForCurrentUser(username, callback)
+                                },
+                                onCheckUsernameAvailable = { username ->
+                                    viewModel.checkUsernameAvailability(username)
+                                },
+                                isUploadingProfilePhoto = isUploadingProfilePhoto,
+                                currentThemeMode = currentThemeMode,
+                                onThemeModeChange = onThemeModeChange,
                                 onSignOut = { viewModel.signOut() }
                             )
                         }
@@ -382,8 +416,21 @@ fun WpChatApp(
                                 uploadingFileName = uploadingFileName,
                                 onBack = { viewModel.closeChat() },
                                 onSendMessage = { viewModel.sendMessage(it) },
-                                onSendMediaMessage = { fileUri, forcedType, caption ->
-                                    viewModel.sendMediaMessage(fileUri, forcedType, caption, context)
+                                onSendMediaMessage = { fileUri, forcedType, caption, viewLimit, allowDownload ->
+                                    viewModel.sendMediaMessage(
+                                        fileUri = fileUri,
+                                        forcedType = forcedType,
+                                        caption = caption,
+                                        viewLimit = viewLimit,
+                                        allowDownload = allowDownload,
+                                        context = context
+                                    )
+                                },
+                                onMarkMediaViewed = { msgId ->
+                                    viewModel.markTemporaryMediaViewed(msgId)
+                                },
+                                onMarkMediaExpired = { msgId ->
+                                    viewModel.markMediaExpired(msgId)
                                 },
                                 onInputChange = { viewModel.onMessageInputChanged(it) },
                                 onAddReaction = { msgId, reaction ->

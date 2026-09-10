@@ -113,6 +113,8 @@ fun ActiveCallScreen(
             val secs = durationSeconds % 60
             String.format(Locale.US, "%02d:%02d", mins, secs)
         }
+        callSession.status == CallStatus.RINGING.name -> "Ringing..."
+        callSession.status == CallStatus.OUTGOING.name -> "Calling..."
         isCaller -> "Calling..."
         else -> "Connecting..."
     }

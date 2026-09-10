@@ -3,22 +3,22 @@ package com.example.ui.theme
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
-// Sophisticated Dark Design System
-val DarkBg = Color(0xFF0C0E14)             // Deep slate black canvas
-val DarkBgSecondary = Color(0xFF11141D)    // Sub-layer canvas
-val DarkSurface = Color(0xFF161A24)        // Cards and elevated panels
-val DarkSurfaceElevated = Color(0xFF1E2330)// Dialogs, popups, and elevated cards
-val DarkSurfaceVariant = Color(0xFF252B3B) // Input backgrounds and chip fills
-val DarkSurfaceHover = Color(0xFF2E3547)   // Pressed/hover states
+// Sophisticated Dark Design System - High Contrast Pure Black Canvas
+val DarkBg = Color(0xFF000000)             // Pure black canvas
+val DarkBgSecondary = Color(0xFF0B0B0B)    // Sub-layer canvas
+val DarkSurface = Color(0xFF141414)        // Cards and elevated panels
+val DarkSurfaceElevated = Color(0xFF1C1C1C)// Dialogs, popups, and elevated cards
+val DarkSurfaceVariant = Color(0xFF222222) // Input backgrounds and chip fills
+val DarkSurfaceHover = Color(0xFF2C2C2C)   // Pressed/hover states
 
-val DarkBorder = Color(0xFF252B3A)         // Primary structural borders
-val DarkBorderSubtle = Color(0xFF333A4E)   // Higher contrast focus & divider borders
-val DarkBorderActive = Color(0xFF4F5B7A)   // Focused input borders
+val DarkBorder = Color(0xFF262626)         // Primary structural borders
+val DarkBorderSubtle = Color(0xFF383838)   // Higher contrast focus & divider borders
+val DarkBorderActive = Color(0xFFFF6B00)   // Focused input borders
 
-val TextPrimary = Color(0xFFF8FAFC)        // Crisp, high-contrast primary text
-val TextSecondary = Color(0xFF94A3B8)      // Clear secondary details and labels
-val TextMuted = Color(0xFF64748B)          // Subdued metadata and timestamps
-val TextDisabled = Color(0xFF475569)       // Disabled text
+val TextPrimary = Color(0xFFFFFFFF)        // Crisp, high-contrast primary text
+val TextSecondary = Color(0xFFE2E8F0)      // Clear secondary details and labels
+val TextMuted = Color(0xFFA0AEC0)          // Subdued metadata and timestamps
+val TextDisabled = Color(0xFF718096)       // Disabled text
 
 val AccentBlue = Color(0xFF3B82F6)         // Primary electric blue
 val AccentBlueLight = Color(0xFF60A5FA)    // Soft highlight blue
@@ -27,6 +27,10 @@ val AccentBlueNavy = Color(0xFF0F172A)     // Dark contrast for text on light pi
 val AccentIndigo = Color(0xFF6366F1)       // Premium indigo tone
 val AccentCyan = Color(0xFF06B6D4)         // Tech cyan accent
 val AccentPurple = Color(0xFF8B5CF6)       // Story / highlight purple
+val AccentOrange = Color(0xFFFF6B00)       // Primary orange accent
+val AccentOrangeLight = Color(0xFFFF8533)  // Soft light orange
+val AccentOrangeDark = Color(0xFFE65100)   // Deep orange tone
+val AccentOrangePill = Color(0x33FF6B00)   // Soft transparent orange for active pill highlights
 
 val PrimaryGradient = Brush.horizontalGradient(
     colors = listOf(Color(0xFF3B82F6), Color(0xFF6366F1))
