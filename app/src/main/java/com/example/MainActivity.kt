@@ -442,9 +442,6 @@ fun WpChatApp(
                                 onMarkMediaExpired = { msgId ->
                                     viewModel.markMediaExpired(msgId)
                                 },
-                                onUnsendMessage = { msgId ->
-                                    viewModel.unsendMessage(msgId)
-                                },
                                 onInputChange = { viewModel.onMessageInputChanged(it) },
                                 onAddReaction = { msgId, reaction ->
                                     viewModel.addReaction(msgId, reaction)

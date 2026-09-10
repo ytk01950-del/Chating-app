@@ -114,7 +114,7 @@ fun SettingsTab(
     var readReceiptsEnabled by remember { mutableStateOf(true) }
     var pushNotificationsEnabled by remember { mutableStateOf(true) }
     var soundVibrationEnabled by remember { mutableStateOf(true) }
-    var selectedDisappearingDefault by remember { mutableIntStateOf(1) } // 1 = View Once, 2 = View Twice (default: View Once)
+    var selectedDisappearingDefault by remember { mutableIntStateOf(0) } // 0 = Keep, 1 = View Once, 2 = View Twice
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -625,16 +625,16 @@ fun SettingsTab(
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        listOf(Pair(1, "View Once"), Pair(2, "View Twice")).forEach { (modeValue, title) ->
-                            val isSelected = selectedDisappearingDefault == modeValue
+                        listOf("Keep in Chat", "View Once", "View Twice").forEachIndexed { index, title ->
+                            val isSelected = selectedDisappearingDefault == index
                             Surface(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(42.dp)
+                                    .height(38.dp)
                                     .clip(RoundedCornerShape(10.dp))
-                                    .clickable { selectedDisappearingDefault = modeValue },
+                                    .clickable { selectedDisappearingDefault = index },
                                 shape = RoundedCornerShape(10.dp),
                                 color = if (isSelected) Color(0xFF2563EB) else if (colors.isDark) Color(0xFF262626) else Color(0xFFEFEFEF),
                                 border = BorderStroke(
@@ -649,8 +649,8 @@ fun SettingsTab(
                                     Text(
                                         text = title,
                                         color = if (isSelected) Color.White else if (colors.isDark) Color.White else Color(0xFF111111),
-                                        fontSize = 13.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                        fontSize = 12.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                     )
                                 }
                             }

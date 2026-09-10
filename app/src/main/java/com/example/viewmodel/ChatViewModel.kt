@@ -1011,12 +1011,7 @@ class ChatViewModel(
         val contact = _activeContact.value ?: return
         val chatId = repository.getChatId(user.id, contact.id)
         viewModelScope.launch {
-            val msg = _activeMessages.value.find { it.id == messageId }
-            // SENDER previewing sent media must NOT mark it as viewed or expired
-            if (msg != null && msg.senderId == user.id) {
-                return@launch
-            }
-            repository.markTemporaryMediaViewed(chatId, messageId, user.id)
+            repository.markTemporaryMediaViewed(chatId, messageId)
         }
     }
 
@@ -1025,26 +1020,7 @@ class ChatViewModel(
         val contact = _activeContact.value ?: return
         val chatId = repository.getChatId(user.id, contact.id)
         viewModelScope.launch {
-            val msg = _activeMessages.value.find { it.id == messageId }
-            // SENDER previewing sent media must NOT mark it as expired
-            if (msg != null && msg.senderId == user.id) {
-                return@launch
-            }
-            repository.markMediaExpired(chatId, messageId, user.id)
-        }
-    }
-
-    fun unsendMessage(messageId: String) {
-        val user = _currentUser.value ?: return
-        val contact = _activeContact.value ?: return
-        val chatId = repository.getChatId(user.id, contact.id)
-        viewModelScope.launch {
-            val result = repository.unsendMessage(chatId, messageId, user.id)
-            if (result.isSuccess) {
-                _infoMessage.value = "Message unsent"
-            } else {
-                _errorMessage.value = "Failed to unsend message"
-            }
+            repository.markMediaExpired(chatId, messageId)
         }
     }
 

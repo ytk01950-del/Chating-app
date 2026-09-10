@@ -1,5 +1,5 @@
 {
-  "name": "NexaChat",
+  "name": "Nexa Messenger",
   "description": "A modern real-time messaging app with 1-on-1 audio and video calling, incoming call receiving UI, call history log, social profiles, media sharing, and live presence.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

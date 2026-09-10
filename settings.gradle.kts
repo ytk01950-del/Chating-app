@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "NexaChat"
+rootProject.name = "Nexa Messenger"
 
 include(":app")
