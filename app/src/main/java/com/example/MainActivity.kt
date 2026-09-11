@@ -96,7 +96,16 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleNotificationIntent(intent: Intent?) {
-        val targetUserId = intent?.getStringExtra(WpChatNotificationHelper.EXTRA_USER_ID)
+        if (intent == null) return
+
+        val callId = intent.getStringExtra(WpChatNotificationHelper.EXTRA_CALL_ID)
+        val callAction = intent.getStringExtra(WpChatNotificationHelper.EXTRA_ACTION_CALL)
+        if (!callId.isNullOrBlank()) {
+            chatViewModel.handleCallFromIntent(callId, callAction ?: "incoming", this)
+            return
+        }
+
+        val targetUserId = intent.getStringExtra(WpChatNotificationHelper.EXTRA_USER_ID)
         if (!targetUserId.isNullOrBlank()) {
             chatViewModel.openChatByUserId(targetUserId)
         }
@@ -480,7 +489,7 @@ fun WpChatApp(
                         }
                     },
                     onReject = {
-                        viewModel.rejectIncomingCall()
+                        viewModel.rejectIncomingCall(context)
                     }
                 )
             }

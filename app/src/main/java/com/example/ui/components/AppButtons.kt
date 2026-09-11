@@ -475,9 +475,21 @@ fun AppFilterChip(
     showOnlineDot: Boolean = false
 ) {
     val colors = AppTheme.colors
-    val containerColor = if (selected) Color(0xFF2563EB) else if (colors.isDark) Color(0xFF262626) else Color(0xFFEFEFEF)
-    val borderColor = if (selected) Color(0xFF2563EB) else if (colors.isDark) Color(0xFF363636) else Color(0xFFDBDBDB)
-    val contentColor = if (selected) Color.White else if (colors.isDark) Color.White else Color(0xFF111111)
+    val containerColor = if (selected) {
+        if (colors.isDark) Color.White else Color(0xFF111111)
+    } else {
+        if (colors.isDark) Color(0xFF1E1E1E) else Color(0xFFEFEFEF)
+    }
+    val borderColor = if (selected) {
+        if (colors.isDark) Color.White else Color(0xFF111111)
+    } else {
+        if (colors.isDark) Color(0xFF333333) else Color(0xFFDBDBDB)
+    }
+    val contentColor = if (selected) {
+        if (colors.isDark) Color.Black else Color.White
+    } else {
+        if (colors.isDark) Color.White else Color(0xFF111111)
+    }
 
     Surface(
         onClick = onClick,
@@ -496,7 +508,7 @@ fun AppFilterChip(
                     modifier = Modifier
                         .size(8.dp)
                         .clip(CircleShape)
-                        .background(OnlineGreen)
+                        .background(Color.White)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
             }
@@ -512,7 +524,9 @@ fun AppFilterChip(
                 Text(
                     text = "($badgeCount)",
                     style = MaterialTheme.typography.labelSmall,
-                    color = if (selected) Color.White.copy(alpha = 0.9f) else if (colors.isDark) Color(0xFFE0E0E0) else colors.textMuted
+                    color = if (selected) {
+                        if (colors.isDark) Color.Black.copy(alpha = 0.8f) else Color.White.copy(alpha = 0.8f)
+                    } else if (colors.isDark) Color(0xFFE0E0E0) else colors.textMuted
                 )
             }
         }

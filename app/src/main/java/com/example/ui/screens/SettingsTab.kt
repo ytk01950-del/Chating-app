@@ -407,15 +407,21 @@ fun SettingsTab(
                         options.forEach { (mode, label, icon) ->
                             val isSelected = currentThemeMode == mode
                             val animatedBg by animateColorAsState(
-                                targetValue = if (isSelected) Color(0xFF2563EB) else if (colors.isDark) Color(0xFF262626) else Color(0xFFEFEFEF),
+                                targetValue = if (isSelected) {
+                                    if (colors.isDark) Color.White else Color(0xFF111111)
+                                } else if (colors.isDark) Color(0xFF1E1E1E) else Color(0xFFEFEFEF),
                                 label = "theme_btn_bg"
                             )
                             val animatedBorder by animateColorAsState(
-                                targetValue = if (isSelected) Color(0xFF2563EB) else if (colors.isDark) Color(0xFF363636) else Color(0xFFDBDBDB),
+                                targetValue = if (isSelected) {
+                                    if (colors.isDark) Color.White else Color(0xFF111111)
+                                } else if (colors.isDark) Color(0xFF333333) else Color(0xFFDBDBDB),
                                 label = "theme_btn_border"
                             )
                             val animatedContentColor by animateColorAsState(
-                                targetValue = if (isSelected) Color.White else if (colors.isDark) Color.White else Color(0xFF111111),
+                                targetValue = if (isSelected) {
+                                    if (colors.isDark) Color.Black else Color.White
+                                } else if (colors.isDark) Color.White else Color(0xFF111111),
                                 label = "theme_btn_content"
                             )
 
@@ -636,10 +642,14 @@ fun SettingsTab(
                                     .clip(RoundedCornerShape(10.dp))
                                     .clickable { selectedDisappearingDefault = index },
                                 shape = RoundedCornerShape(10.dp),
-                                color = if (isSelected) Color(0xFF2563EB) else if (colors.isDark) Color(0xFF262626) else Color(0xFFEFEFEF),
+                                color = if (isSelected) {
+                                    if (colors.isDark) Color.White else Color(0xFF111111)
+                                } else if (colors.isDark) Color(0xFF1E1E1E) else Color(0xFFEFEFEF),
                                 border = BorderStroke(
                                     1.dp,
-                                    if (isSelected) Color(0xFF2563EB) else if (colors.isDark) Color(0xFF363636) else Color(0xFFDBDBDB)
+                                    if (isSelected) {
+                                        if (colors.isDark) Color.White else Color(0xFF111111)
+                                    } else if (colors.isDark) Color(0xFF333333) else Color(0xFFDBDBDB)
                                 )
                             ) {
                                 Box(
@@ -648,7 +658,9 @@ fun SettingsTab(
                                 ) {
                                     Text(
                                         text = title,
-                                        color = if (isSelected) Color.White else if (colors.isDark) Color.White else Color(0xFF111111),
+                                        color = if (isSelected) {
+                                            if (colors.isDark) Color.Black else Color.White
+                                        } else if (colors.isDark) Color.White else Color(0xFF111111),
                                         fontSize = 12.sp,
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                     )
@@ -724,6 +736,48 @@ fun SettingsTab(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "System Notification Channels",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = colors.textPrimary
+                            )
+                            Text(
+                                text = "Messages & High-Priority Calls (v3 Channels Active)",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = colors.textMuted
+                            )
+                        }
+
+                        TextButton(
+                            onClick = {
+                                try {
+                                    val intent = android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                                        putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
+                                    }
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Please configure in device App Settings", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        ) {
+                            Text(
+                                text = "Configure",
+                                color = if (colors.isDark) Color.White else Color.Black,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Column {
                             Text(
                                 text = "App Storage & Cache",
@@ -732,7 +786,7 @@ fun SettingsTab(
                                 color = colors.textPrimary
                             )
                             Text(
-                                text = "WP CHAT v2.4 iOS Edition • 4.2 MB Cached",
+                                text = "Nexa Messenger v3.0 • 4.2 MB Cached",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = colors.textMuted
                             )
@@ -745,7 +799,7 @@ fun SettingsTab(
                         ) {
                             Text(
                                 text = "Clear Cache",
-                                color = colors.accentOrange,
+                                color = if (colors.isDark) Color.White else Color.Black,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.sp
                             )
@@ -846,7 +900,7 @@ fun SettingsTab(
                     Icon(
                         imageVector = Icons.Default.AlternateEmail,
                         contentDescription = null,
-                        tint = Color(0xFF2563EB),
+                        tint = colors.textPrimary,
                         modifier = Modifier.size(24.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
@@ -875,14 +929,14 @@ fun SettingsTab(
                             availabilityError = null
                         },
                         placeholder = { Text("e.g. alex_rivera", color = colors.textMuted) },
-                        prefix = { Text("@", color = Color(0xFF2563EB), fontWeight = FontWeight.Bold) },
+                        prefix = { Text("@", color = colors.textPrimary, fontWeight = FontWeight.Bold) },
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = colors.textPrimary,
                             unfocusedTextColor = colors.textPrimary,
                             focusedContainerColor = colors.surfaceVariant,
                             unfocusedContainerColor = colors.surfaceVariant,
-                            focusedBorderColor = Color(0xFF2563EB),
+                            focusedBorderColor = colors.textPrimary,
                             unfocusedBorderColor = colors.borderSubtle
                         ),
                         modifier = Modifier.fillMaxWidth()
@@ -931,14 +985,25 @@ fun SettingsTab(
                             }
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (colors.isDark) Color.White else Color(0xFF111111),
+                        contentColor = if (colors.isDark) Color.Black else Color.White
+                    ),
                     shape = RoundedCornerShape(10.dp),
                     enabled = usernameInput.length >= 3 && !isCheckingAvailability
                 ) {
                     if (isCheckingAvailability) {
-                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        CircularProgressIndicator(
+                            color = if (colors.isDark) Color.Black else Color.White,
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp
+                        )
                     } else {
-                        Text("Claim ID", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text(
+                            "Claim ID",
+                            color = if (colors.isDark) Color.Black else Color.White,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             },
@@ -979,7 +1044,7 @@ fun SettingsTab(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = colors.textPrimary,
                             unfocusedTextColor = colors.textPrimary,
-                            focusedBorderColor = Color(0xFF2563EB),
+                            focusedBorderColor = colors.textPrimary,
                             unfocusedBorderColor = colors.borderSubtle
                         ),
                         modifier = Modifier.fillMaxWidth()
@@ -993,7 +1058,7 @@ fun SettingsTab(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = colors.textPrimary,
                             unfocusedTextColor = colors.textPrimary,
-                            focusedBorderColor = Color(0xFF2563EB),
+                            focusedBorderColor = colors.textPrimary,
                             unfocusedBorderColor = colors.borderSubtle
                         ),
                         modifier = Modifier.fillMaxWidth()
@@ -1007,7 +1072,7 @@ fun SettingsTab(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = colors.textPrimary,
                             unfocusedTextColor = colors.textPrimary,
-                            focusedBorderColor = Color(0xFF2563EB),
+                            focusedBorderColor = colors.textPrimary,
                             unfocusedBorderColor = colors.borderSubtle
                         ),
                         modifier = Modifier.fillMaxWidth()
@@ -1033,8 +1098,15 @@ fun SettingsTab(
                                     .height(36.dp)
                                     .clip(RoundedCornerShape(8.dp))
                                     .clickable { editGender = gender },
-                                color = if (isSelected) Color(0xFF2563EB) else if (colors.isDark) Color(0xFF262626) else Color(0xFFEFEFEF),
-                                border = BorderStroke(1.dp, if (isSelected) Color(0xFF2563EB) else if (colors.isDark) Color(0xFF363636) else Color(0xFFDBDBDB)),
+                                color = if (isSelected) {
+                                    if (colors.isDark) Color.White else Color(0xFF111111)
+                                } else if (colors.isDark) Color(0xFF1E1E1E) else Color(0xFFEFEFEF),
+                                border = BorderStroke(
+                                    1.dp,
+                                    if (isSelected) {
+                                        if (colors.isDark) Color.White else Color(0xFF111111)
+                                    } else if (colors.isDark) Color(0xFF333333) else Color(0xFFDBDBDB)
+                                ),
                                 shape = RoundedCornerShape(8.dp)
                             ) {
                                 Box(
@@ -1043,7 +1115,9 @@ fun SettingsTab(
                                 ) {
                                     Text(
                                         text = gender,
-                                        color = if (isSelected) Color.White else if (colors.isDark) Color.White else Color(0xFF111111),
+                                        color = if (isSelected) {
+                                            if (colors.isDark) Color.Black else Color.White
+                                        } else if (colors.isDark) Color.White else Color(0xFF111111),
                                         fontSize = 12.sp,
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                     )
@@ -1062,11 +1136,18 @@ fun SettingsTab(
                             Toast.makeText(context, "Profile updated successfully!", Toast.LENGTH_SHORT).show()
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (colors.isDark) Color.White else Color(0xFF111111),
+                        contentColor = if (colors.isDark) Color.Black else Color.White
+                    ),
                     shape = RoundedCornerShape(10.dp),
                     enabled = editName.isNotBlank()
                 ) {
-                    Text("Save Changes", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text(
+                        "Save Changes",
+                        color = if (colors.isDark) Color.Black else Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             },
             dismissButton = {
@@ -1108,7 +1189,7 @@ private fun SettingsSwitchRow(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = if (checked) Color(0xFF2563EB) else colors.textMuted,
+                    tint = if (checked) colors.textPrimary else colors.textMuted,
                     modifier = Modifier.size(18.dp)
                 )
             }

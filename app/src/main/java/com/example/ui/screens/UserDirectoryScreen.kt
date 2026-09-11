@@ -197,7 +197,7 @@ fun UserDirectoryScreen(
                             Icon(
                                 imageVector = Icons.Default.Search,
                                 contentDescription = "Search",
-                                tint = if (isSearchUsersMode) Color(0xFF2563EB) else colors.textPrimary,
+                                tint = if (isSearchUsersMode) colors.accentOrange else colors.textPrimary,
                                 modifier = Modifier.size(22.dp)
                             )
                         }
@@ -350,7 +350,7 @@ private fun ChatsTabView(
                     Icon(
                         imageVector = Icons.Default.WarningAmber,
                         contentDescription = null,
-                        tint = Color(0xFF2563EB),
+                        tint = colors.textPrimary,
                         modifier = Modifier.size(22.dp)
                     )
                     Spacer(modifier = Modifier.width(10.dp))
@@ -420,7 +420,7 @@ private fun ChatsTabView(
                         unfocusedTextColor = colors.textPrimary,
                         focusedContainerColor = if (colors.isDark) Color(0xFF262626) else Color(0xFFEFEFEF),
                         unfocusedContainerColor = if (colors.isDark) Color(0xFF262626) else Color(0xFFEFEFEF),
-                        focusedBorderColor = Color(0xFF2563EB),
+                        focusedBorderColor = colors.textPrimary,
                         unfocusedBorderColor = if (colors.isDark) Color(0xFF363636) else Color(0xFFDBDBDB)
                     ),
                     modifier = Modifier
@@ -471,7 +471,7 @@ private fun ChatsTabView(
                             unfocusedTextColor = colors.textPrimary,
                             focusedContainerColor = if (colors.isDark) Color(0xFF262626) else Color(0xFFEFEFEF),
                             unfocusedContainerColor = if (colors.isDark) Color(0xFF262626) else Color(0xFFEFEFEF),
-                            focusedBorderColor = Color(0xFF2563EB),
+                            focusedBorderColor = colors.textPrimary,
                             unfocusedBorderColor = if (colors.isDark) Color(0xFF363636) else Color(0xFFDBDBDB)
                         ),
                         modifier = Modifier

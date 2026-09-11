@@ -1067,6 +1067,10 @@ class ChatViewModel(
 
     fun acceptIncomingCall(context: Context? = null) {
         val incoming = _incomingCall.value ?: return
+        if (context != null) {
+            com.example.service.IncomingCallRingingService.stopRinging(context)
+            com.example.util.WpChatNotificationHelper.cancelCallNotification(context, incoming.callId)
+        }
         viewModelScope.launch {
             _incomingCall.value = null
             _isSpeakerOn.value = incoming.isVideoCall()
@@ -1095,17 +1099,68 @@ class ChatViewModel(
         }
     }
 
-    fun rejectIncomingCall() {
+    fun rejectIncomingCall(context: Context? = null) {
         val incoming = _incomingCall.value ?: return
+        if (context != null) {
+            com.example.service.IncomingCallRingingService.stopRinging(context)
+            com.example.util.WpChatNotificationHelper.cancelCallNotification(context, incoming.callId)
+        }
         viewModelScope.launch {
             _incomingCall.value = null
             repository.rejectCall(incoming)
         }
     }
 
+    fun handleCallFromIntent(callId: String, action: String, context: Context? = null) {
+        if (callId.isBlank()) return
+        if (context != null) {
+            com.example.service.IncomingCallRingingService.stopRinging(context)
+            com.example.util.WpChatNotificationHelper.cancelCallNotification(context, callId)
+        }
+
+        viewModelScope.launch {
+            repository.observeCallSession(callId).collect { session ->
+                if (session != null) {
+                    if (action == "accept" || session.status == CallStatus.ACCEPTED.name) {
+                        _incomingCall.value = null
+                        _isSpeakerOn.value = session.isVideoCall()
+                        _isMicMuted.value = false
+                        _isVideoCameraOff.value = false
+                        _isFrontCamera.value = true
+                        _callDurationSeconds.value = 0L
+
+                        if (context != null) {
+                            repository.setSpeakerphone(context, _isSpeakerOn.value)
+                            repository.setMicrophoneMute(context, false)
+                        }
+
+                        if (session.status != CallStatus.ACCEPTED.name) {
+                            repository.acceptCall(callId)
+                        }
+
+                        _activeCallSession.value = session.copy(
+                            status = CallStatus.ACCEPTED.name,
+                            startedAt = if (session.startedAt > 0) session.startedAt else System.currentTimeMillis()
+                        )
+                        listenToActiveCallSession(callId)
+                        startCallTimer()
+                    } else if (session.status == CallStatus.RINGING.name || session.status == CallStatus.OUTGOING.name) {
+                        _incomingCall.value = session
+                    }
+                }
+            }
+        }
+    }
+
     fun endActiveCall(context: Context? = null) {
         val active = _activeCallSession.value
         val incoming = _incomingCall.value
+
+        if (context != null) {
+            com.example.service.IncomingCallRingingService.stopRinging(context)
+            if (active != null) com.example.util.WpChatNotificationHelper.cancelCallNotification(context, active.callId)
+            if (incoming != null) com.example.util.WpChatNotificationHelper.cancelCallNotification(context, incoming.callId)
+        }
 
         viewModelScope.launch {
             callTimerJob?.cancel()

@@ -155,36 +155,14 @@ fun AuthScreen(
     val focusManager = LocalFocusManager.current
     val isLoading = authUiState is AuthUiState.Loading
 
-    val premiumBlueGradient = Brush.horizontalGradient(
-        colors = listOf(Color(0xFF2563EB), Color(0xFF1D4ED8))
-    )
-
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF050508))
+            .background(Color(0xFF000000))
             .systemBarsPadding()
             .imePadding(),
         contentAlignment = Alignment.Center
     ) {
-        // Ambient soft background glow behind top logo
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 10.dp)
-                .size(320.dp)
-                .background(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            Color(0x1E3B82F6),
-                            Color(0x0A2563EB),
-                            Color.Transparent
-                        )
-                    ),
-                    shape = CircleShape
-                )
-        )
-
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -223,7 +201,7 @@ fun AuthScreen(
                 style = MaterialTheme.typography.bodyMedium.copy(
                     letterSpacing = 0.2.sp
                 ),
-                color = Color(0xFF9E9EA8),
+                color = Color(0xFFCCCCCC),
                 textAlign = TextAlign.Center
             )
 
@@ -237,23 +215,15 @@ fun AuthScreen(
                         elevation = 16.dp,
                         shape = RoundedCornerShape(24.dp),
                         ambientColor = Color(0x55000000),
-                        spotColor = Color(0x333B82F6)
+                        spotColor = Color(0x33000000)
                     ),
                 shape = RoundedCornerShape(24.dp),
-                color = Color.Transparent,
+                color = Color(0xFF121212),
                 border = BorderStroke(1.dp, Color(0x24FFFFFF))
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(
-                                    Color(0xFF16161D),
-                                    Color(0xFF0E0E14)
-                                )
-                            )
-                        )
                         .padding(22.dp)
                 ) {
                     Column(
@@ -265,7 +235,7 @@ fun AuthScreen(
                                 .fillMaxWidth()
                                 .height(46.dp)
                                 .clip(RoundedCornerShape(14.dp))
-                                .background(Color(0xFF09090C))
+                                .background(Color(0xFF181818))
                                 .border(1.dp, Color(0x1FFFFFFF), RoundedCornerShape(14.dp))
                                 .padding(3.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -276,14 +246,7 @@ fun AuthScreen(
                                     .weight(1f)
                                     .clip(RoundedCornerShape(11.dp))
                                     .background(
-                                        if (selectedTab == 0) Color(0xFF1F1F2A) else Color.Transparent
-                                    )
-                                    .then(
-                                        if (selectedTab == 0) Modifier.border(
-                                            1.dp,
-                                            Color(0x33FFFFFF),
-                                            RoundedCornerShape(11.dp)
-                                        ) else Modifier
+                                        if (selectedTab == 0) Color.White else Color.Transparent
                                     )
                                     .clickable {
                                         selectedTab = 0
@@ -297,7 +260,7 @@ fun AuthScreen(
                                     text = "Log In",
                                     fontSize = 14.sp,
                                     fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (selectedTab == 0) Color.White else Color(0xFF8E8E9A)
+                                    color = if (selectedTab == 0) Color.Black else Color(0xFF888888)
                                 )
                             }
 
@@ -307,14 +270,7 @@ fun AuthScreen(
                                     .weight(1f)
                                     .clip(RoundedCornerShape(11.dp))
                                     .background(
-                                        if (selectedTab == 1) Color(0xFF1F1F2A) else Color.Transparent
-                                    )
-                                    .then(
-                                        if (selectedTab == 1) Modifier.border(
-                                            1.dp,
-                                            Color(0x33FFFFFF),
-                                            RoundedCornerShape(11.dp)
-                                        ) else Modifier
+                                        if (selectedTab == 1) Color.White else Color.Transparent
                                     )
                                     .clickable {
                                         selectedTab = 1
@@ -328,7 +284,7 @@ fun AuthScreen(
                                     text = "Sign Up",
                                     fontSize = 14.sp,
                                     fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (selectedTab == 1) Color.White else Color(0xFF8E8E9A)
+                                    color = if (selectedTab == 1) Color.Black else Color(0xFF888888)
                                 )
                             }
                         }
@@ -375,10 +331,10 @@ fun AuthScreen(
                             OutlinedTextField(
                                 value = displayName,
                                 onValueChange = { displayName = it },
-                                label = { Text("Display Name", color = Color(0xFF9E9EA8)) },
-                                placeholder = { Text("e.g. Alex River", color = Color(0xFF6B6B78)) },
+                                label = { Text("Display Name", color = Color(0xFFCCCCCC)) },
+                                placeholder = { Text("e.g. Alex River", color = Color(0xFF777777)) },
                                 leadingIcon = {
-                                    Icon(Icons.Default.Person, contentDescription = null, tint = AccentBlue)
+                                    Icon(Icons.Default.Person, contentDescription = null, tint = Color.White)
                                 },
                                 singleLine = true,
                                 modifier = Modifier
@@ -390,9 +346,9 @@ fun AuthScreen(
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedTextColor = Color.White,
                                     unfocusedTextColor = Color.White,
-                                    focusedContainerColor = Color(0xFF101015),
-                                    unfocusedContainerColor = Color(0xFF101015),
-                                    focusedBorderColor = AccentBlue,
+                                    focusedContainerColor = Color(0xFF181818),
+                                    unfocusedContainerColor = Color(0xFF181818),
+                                    focusedBorderColor = Color.White,
                                     unfocusedBorderColor = Color(0x2EFFFFFF)
                                 )
                             )
@@ -406,25 +362,25 @@ fun AuthScreen(
                                     val clean = input.filter { it.isLetterOrDigit() || it == '_' || it == '.' || it == '@' }
                                     username = clean
                                 },
-                                label = { Text("Chat ID / Username (Unique)", color = Color(0xFF9E9EA8)) },
-                                placeholder = { Text("e.g. alex_99", color = Color(0xFF6B6B78)) },
+                                label = { Text("Chat ID / Username (Unique)", color = Color(0xFFCCCCCC)) },
+                                placeholder = { Text("e.g. alex_99", color = Color(0xFF777777)) },
                                 prefix = {
                                     Text(
                                         "@",
-                                        color = AccentBlue,
+                                        color = Color.White,
                                         fontWeight = FontWeight.Bold,
                                         modifier = Modifier.padding(end = 2.dp)
                                     )
                                 },
                                 leadingIcon = {
-                                    Icon(Icons.Default.AlternateEmail, contentDescription = null, tint = AccentBlue)
+                                    Icon(Icons.Default.AlternateEmail, contentDescription = null, tint = Color.White)
                                 },
                                 trailingIcon = {
                                     when {
                                         isCheckingUsername -> {
                                             CircularProgressIndicator(
                                                 modifier = Modifier.size(18.dp),
-                                                color = AccentBlue,
+                                                color = Color.White,
                                                 strokeWidth = 2.dp
                                             )
                                         }
@@ -432,7 +388,7 @@ fun AuthScreen(
                                             Icon(
                                                 imageVector = Icons.Default.CheckCircle,
                                                 contentDescription = "Available",
-                                                tint = OnlineGreen
+                                                tint = Color.White
                                             )
                                         }
                                         usernameAvailable == false || usernameValidationError != null -> {
@@ -447,19 +403,19 @@ fun AuthScreen(
                                 supportingText = {
                                     when {
                                         isCheckingUsername -> {
-                                            Text("Checking availability...", color = Color(0xFF9E9EA8), fontSize = 12.sp)
+                                            Text("Checking availability...", color = Color(0xFF888888), fontSize = 12.sp)
                                         }
                                         usernameValidationError != null -> {
                                             Text(usernameValidationError.orEmpty(), color = Color(0xFFFFB4AB), fontSize = 12.sp)
                                         }
                                         usernameAvailable == true -> {
-                                            Text("✓ @$normalizedUsername is available!", color = OnlineGreen, fontSize = 12.sp)
+                                            Text("✓ @$normalizedUsername is available!", color = Color.White, fontSize = 12.sp)
                                         }
                                         usernameAvailable == false -> {
                                             Text("✗ @$normalizedUsername is already taken", color = Color(0xFFFFB4AB), fontSize = 12.sp)
                                         }
                                         else -> {
-                                            Text("4–20 characters (letters, numbers, _, .)", color = Color(0xFF6B6B78), fontSize = 12.sp)
+                                            Text("4–20 characters (letters, numbers, _, .)", color = Color(0xFF777777), fontSize = 12.sp)
                                         }
                                     }
                                 },
@@ -473,9 +429,9 @@ fun AuthScreen(
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedTextColor = Color.White,
                                     unfocusedTextColor = Color.White,
-                                    focusedContainerColor = Color(0xFF101015),
-                                    unfocusedContainerColor = Color(0xFF101015),
-                                    focusedBorderColor = if (usernameAvailable == true) OnlineGreen else AccentBlue,
+                                    focusedContainerColor = Color(0xFF181818),
+                                    unfocusedContainerColor = Color(0xFF181818),
+                                    focusedBorderColor = Color.White,
                                     unfocusedBorderColor = Color(0x2EFFFFFF)
                                 )
                             )
@@ -486,7 +442,7 @@ fun AuthScreen(
                                 text = "Choose Profile Avatar",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.SemiBold,
-                                color = Color(0xFF9E9EA8)
+                                color = Color(0xFFCCCCCC)
                             )
 
                             Spacer(modifier = Modifier.height(8.dp))
@@ -504,7 +460,7 @@ fun AuthScreen(
                                             .clickable { selectedAvatarId = idx }
                                             .border(
                                                 width = if (isSelected) 2.5.dp else 0.dp,
-                                                color = if (isSelected) AccentBlue else Color.Transparent,
+                                                color = if (isSelected) Color.White else Color.Transparent,
                                                 shape = CircleShape
                                             )
                                             .padding(2.dp),
@@ -526,10 +482,10 @@ fun AuthScreen(
                         OutlinedTextField(
                             value = email,
                             onValueChange = { email = it },
-                            label = { Text("Email Address", color = Color(0xFF9E9EA8)) },
-                            placeholder = { Text("Email or Username", color = Color(0xFF6B6B78)) },
+                            label = { Text("Email Address", color = Color(0xFFCCCCCC)) },
+                            placeholder = { Text("Email or Username", color = Color(0xFF777777)) },
                             leadingIcon = {
-                                Icon(Icons.Default.Email, contentDescription = null, tint = AccentBlue)
+                                Icon(Icons.Default.Email, contentDescription = null, tint = Color.White)
                             },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(
@@ -544,9 +500,9 @@ fun AuthScreen(
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedTextColor = Color.White,
                                 unfocusedTextColor = Color.White,
-                                focusedContainerColor = Color(0xFF101015),
-                                unfocusedContainerColor = Color(0xFF101015),
-                                focusedBorderColor = AccentBlue,
+                                focusedContainerColor = Color(0xFF181818),
+                                unfocusedContainerColor = Color(0xFF181818),
+                                focusedBorderColor = Color.White,
                                 unfocusedBorderColor = Color(0x2EFFFFFF)
                             )
                         )
@@ -557,17 +513,17 @@ fun AuthScreen(
                         OutlinedTextField(
                             value = password,
                             onValueChange = { password = it },
-                            label = { Text("Password", color = Color(0xFF9E9EA8)) },
-                            placeholder = { Text("Password", color = Color(0xFF6B6B78)) },
+                            label = { Text("Password", color = Color(0xFFCCCCCC)) },
+                            placeholder = { Text("Password", color = Color(0xFF777777)) },
                             leadingIcon = {
-                                Icon(Icons.Default.Lock, contentDescription = null, tint = AccentBlue)
+                                Icon(Icons.Default.Lock, contentDescription = null, tint = Color.White)
                             },
                             trailingIcon = {
                                 IconButton(onClick = { passwordVisible = !passwordVisible }) {
                                     Icon(
                                         imageVector = if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                                         contentDescription = if (passwordVisible) "Hide password" else "Show password",
-                                        tint = Color(0xFF8E8E9A)
+                                        tint = Color(0xFF888888)
                                     )
                                 }
                             },
@@ -589,9 +545,9 @@ fun AuthScreen(
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedTextColor = Color.White,
                                 unfocusedTextColor = Color.White,
-                                focusedContainerColor = Color(0xFF101015),
-                                unfocusedContainerColor = Color(0xFF101015),
-                                focusedBorderColor = AccentBlue,
+                                focusedContainerColor = Color(0xFF181818),
+                                unfocusedContainerColor = Color(0xFF181818),
+                                focusedBorderColor = Color.White,
                                 unfocusedBorderColor = Color(0x2EFFFFFF)
                             )
                         )
@@ -613,7 +569,7 @@ fun AuthScreen(
                                         style = MaterialTheme.typography.bodySmall.copy(
                                             fontWeight = FontWeight.Medium
                                         ),
-                                        color = Color(0xFF60A5FA)
+                                        color = Color.White
                                     )
                                 }
                             }
@@ -623,7 +579,7 @@ fun AuthScreen(
 
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        // Premium Blue Login / Sign Up Action Button
+                        // Premium Monochrome Login Action Button (White with Black text)
                         val buttonInteraction = remember { MutableInteractionSource() }
                         val isPressed by buttonInteraction.collectIsPressedAsState()
                         val animatedBtnScale by animateFloatAsState(
@@ -638,11 +594,11 @@ fun AuthScreen(
                                 .scale(animatedBtnScale)
                                 .height(50.dp)
                                 .clip(RoundedCornerShape(14.dp))
-                                .background(premiumBlueGradient)
+                                .background(Color.White)
                                 .clickable(
                                     enabled = !isLoading,
                                     interactionSource = buttonInteraction,
-                                    indication = ripple(bounded = true, color = Color.White),
+                                    indication = ripple(bounded = true, color = Color.Black),
                                     role = Role.Button,
                                     onClick = {
                                         focusManager.clearFocus()
@@ -659,7 +615,7 @@ fun AuthScreen(
                             if (isLoading) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(22.dp),
-                                    color = Color.White,
+                                    color = Color.Black,
                                     strokeWidth = 2.5.dp
                                 )
                             } else {
@@ -670,7 +626,7 @@ fun AuthScreen(
                                         fontWeight = FontWeight.Bold,
                                         letterSpacing = 0.6.sp
                                     ),
-                                    color = Color.White
+                                    color = Color.Black
                                 )
                             }
                         }
@@ -686,14 +642,14 @@ fun AuthScreen(
                             Text(
                                 text = if (selectedTab == 0) "Don't have an account? " else "Already have an account? ",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = Color(0xFF8E8E9A)
+                                color = Color(0xFF888888)
                             )
                             Text(
                                 text = if (selectedTab == 0) "Create a New Account" else "Log In",
                                 style = MaterialTheme.typography.bodySmall.copy(
                                     fontWeight = FontWeight.Bold
                                 ),
-                                color = Color(0xFF60A5FA),
+                                color = Color.White,
                                 modifier = Modifier
                                     .clickable {
                                         selectedTab = if (selectedTab == 0) 1 else 0
@@ -733,7 +689,7 @@ fun AuthScreen(
 
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        // Continue with Google Button (Modern Dark Frosted Glass)
+                        // Continue with Google Button (Black with white border and white text)
                         val googleInteraction = remember { MutableInteractionSource() }
                         val isGooglePressed by googleInteraction.collectIsPressedAsState()
                         val googleBtnScale by animateFloatAsState(
@@ -748,8 +704,8 @@ fun AuthScreen(
                                 .scale(googleBtnScale)
                                 .height(48.dp)
                                 .clip(RoundedCornerShape(14.dp))
-                                .background(Color(0xFF14141B))
-                                .border(1.dp, Color(0x28FFFFFF), RoundedCornerShape(14.dp))
+                                .background(Color(0xFF181818))
+                                .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(14.dp))
                                 .clickable(
                                     enabled = !isLoading,
                                     interactionSource = googleInteraction,
@@ -787,7 +743,7 @@ fun AuthScreen(
                             ) {
                                 Text(
                                     text = "G",
-                                    color = Color(0xFF1E1E1E),
+                                    color = Color.Black,
                                     fontWeight = FontWeight.Black,
                                     fontSize = 14.sp
                                 )
@@ -812,11 +768,11 @@ fun AuthScreen(
         }
     }
 
-    // Reset Password Dialog (Dark Glassmorphism Style)
+    // Reset Password Dialog (Dark Monochrome Style)
     if (showForgotPasswordDialog) {
         AlertDialog(
             onDismissRequest = { showForgotPasswordDialog = false },
-            containerColor = Color(0xFF14141B),
+            containerColor = Color(0xFF181818),
             title = {
                 Text(
                     "Reset Password",
@@ -828,23 +784,23 @@ fun AuthScreen(
                 Column {
                     Text(
                         "Enter the email associated with your account to receive password reset instructions.",
-                        color = Color(0xFF9E9EA8),
+                        color = Color(0xFFCCCCCC),
                         fontSize = 14.sp
                     )
                     Spacer(modifier = Modifier.height(14.dp))
                     OutlinedTextField(
                         value = resetEmail,
                         onValueChange = { resetEmail = it },
-                        label = { Text("Email Address", color = Color(0xFF9E9EA8)) },
+                        label = { Text("Email Address", color = Color(0xFFCCCCCC)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = Color.White,
                             unfocusedTextColor = Color.White,
-                            focusedContainerColor = Color(0xFF0C0C10),
-                            unfocusedContainerColor = Color(0xFF0C0C10),
-                            focusedBorderColor = AccentBlue,
+                            focusedContainerColor = Color(0xFF121212),
+                            unfocusedContainerColor = Color(0xFF121212),
+                            focusedBorderColor = Color.White,
                             unfocusedBorderColor = Color(0x2EFFFFFF)
                         )
                     )
@@ -858,8 +814,8 @@ fun AuthScreen(
                     },
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = AccentBlue,
-                        contentColor = Color.White
+                        containerColor = Color.White,
+                        contentColor = Color.Black
                     )
                 ) {
                     Text("Send Email", fontWeight = FontWeight.Bold)
@@ -867,7 +823,7 @@ fun AuthScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showForgotPasswordDialog = false }) {
-                    Text("Cancel", color = Color(0xFF9E9EA8))
+                    Text("Cancel", color = Color(0xFF888888))
                 }
             }
         )

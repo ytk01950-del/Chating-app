@@ -212,7 +212,7 @@ fun CallsTab(
                             Spacer(modifier = Modifier.height(20.dp))
                             Surface(
                                 shape = RoundedCornerShape(22.dp),
-                                color = Color(0xFF2563EB),
+                                color = if (colors.isDark) Color.White else Color(0xFF111111),
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(22.dp))
                                     .clickable { showNewCallDialog = true }
@@ -225,13 +225,13 @@ fun CallsTab(
                                     Icon(
                                         imageVector = Icons.Default.Call,
                                         contentDescription = null,
-                                        tint = Color.White,
+                                        tint = if (colors.isDark) Color.Black else Color.White,
                                         modifier = Modifier.size(18.dp)
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
                                         text = "Start a Call",
-                                        color = Color.White,
+                                        color = if (colors.isDark) Color.Black else Color.White,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 14.sp
                                     )
@@ -291,7 +291,7 @@ fun CallsTab(
                     Icon(
                         imageVector = Icons.Default.Call,
                         contentDescription = null,
-                        tint = Color(0xFF2563EB),
+                        tint = colors.textPrimary,
                         modifier = Modifier.size(24.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
@@ -325,7 +325,7 @@ fun CallsTab(
                             unfocusedTextColor = colors.textPrimary,
                             focusedContainerColor = if (colors.isDark) Color(0xFF1E1E1E) else Color(0xFFF5F5F5),
                             unfocusedContainerColor = if (colors.isDark) Color(0xFF1E1E1E) else Color(0xFFF5F5F5),
-                            focusedBorderColor = Color(0xFF2563EB),
+                            focusedBorderColor = colors.textPrimary,
                             unfocusedBorderColor = if (colors.isDark) Color(0xFF363636) else Color(0xFFDBDBDB)
                         ),
                         modifier = Modifier.fillMaxWidth()
@@ -406,12 +406,12 @@ fun CallsTab(
                                                 },
                                                 modifier = Modifier
                                                     .size(34.dp)
-                                                    .background(if (colors.isDark) Color(0xFF262626) else Color(0xFFDBEAFE), CircleShape)
+                                                    .background(if (colors.isDark) Color(0xFF262626) else Color(0xFFEEEEEE), CircleShape)
                                             ) {
                                                 Icon(
                                                     imageVector = Icons.Default.Call,
                                                     contentDescription = "Voice Call",
-                                                    tint = Color(0xFF2563EB),
+                                                    tint = colors.textPrimary,
                                                     modifier = Modifier.size(16.dp)
                                                 )
                                             }
@@ -423,12 +423,12 @@ fun CallsTab(
                                                 },
                                                 modifier = Modifier
                                                     .size(34.dp)
-                                                    .background(Color(0xFF38BDF8).copy(alpha = 0.15f), CircleShape)
+                                                    .background(if (colors.isDark) Color(0xFF262626) else Color(0xFFEEEEEE), CircleShape)
                                             ) {
                                                 Icon(
                                                     imageVector = Icons.Default.Videocam,
                                                     contentDescription = "Video Call",
-                                                    tint = Color(0xFF38BDF8),
+                                                    tint = colors.textPrimary,
                                                     modifier = Modifier.size(16.dp)
                                                 )
                                             }
@@ -559,13 +559,13 @@ fun CallHistoryItemCard(
                     onClick = onVoiceCall,
                     modifier = Modifier
                         .size(38.dp)
-                        .background(if (colors.isDark) Color(0xFF262626) else Color(0xFFDBEAFE), CircleShape)
+                        .background(if (colors.isDark) Color(0xFF262626) else Color(0xFFEEEEEE), CircleShape)
                         .testTag("call_item_voice_btn_${record.callId}")
                 ) {
                     Icon(
                         imageVector = Icons.Default.Call,
                         contentDescription = "Voice Call",
-                        tint = Color(0xFF2563EB),
+                        tint = colors.textPrimary,
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -574,13 +574,13 @@ fun CallHistoryItemCard(
                     onClick = onVideoCall,
                     modifier = Modifier
                         .size(38.dp)
-                        .background(Color(0xFF38BDF8).copy(alpha = 0.14f), CircleShape)
+                        .background(if (colors.isDark) Color(0xFF262626) else Color(0xFFEEEEEE), CircleShape)
                         .testTag("call_item_video_btn_${record.callId}")
                 ) {
                     Icon(
                         imageVector = Icons.Default.Videocam,
                         contentDescription = "Video Call",
-                        tint = Color(0xFF38BDF8),
+                        tint = colors.textPrimary,
                         modifier = Modifier.size(18.dp)
                     )
                 }

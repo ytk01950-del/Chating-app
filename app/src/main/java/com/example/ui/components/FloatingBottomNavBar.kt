@@ -157,12 +157,12 @@ fun FloatingBottomNavBar(
                                                     .offset(x = 10.dp, y = (-6).dp)
                                                     .size(16.dp)
                                                     .clip(CircleShape)
-                                                    .background(colors.accentOrange),
+                                                    .background(Color.White),
                                                 contentAlignment = Alignment.Center
                                             ) {
                                                 Text(
                                                     text = if (unreadChatsCount > 9) "9+" else unreadChatsCount.toString(),
-                                                    color = Color.White,
+                                                    color = Color.Black,
                                                     fontSize = 9.sp,
                                                     fontWeight = FontWeight.Bold
                                                 )
@@ -176,12 +176,12 @@ fun FloatingBottomNavBar(
                                                     .offset(x = 10.dp, y = (-6).dp)
                                                     .size(16.dp)
                                                     .clip(CircleShape)
-                                                    .background(Color(0xFFEF4444)),
+                                                    .background(Color.White),
                                                 contentAlignment = Alignment.Center
                                             ) {
                                                 Text(
                                                     text = if (missedCallsCount > 9) "9+" else missedCallsCount.toString(),
-                                                    color = Color.White,
+                                                    color = Color.Black,
                                                     fontSize = 9.sp,
                                                     fontWeight = FontWeight.Bold
                                                 )
@@ -195,7 +195,7 @@ fun FloatingBottomNavBar(
                                                     .offset(x = 9.dp, y = (-6).dp)
                                                     .size(8.dp)
                                                     .clip(CircleShape)
-                                                    .background(Color(0xFFF43F5E))
+                                                    .background(Color.White)
                                             )
                                         }
                                     }

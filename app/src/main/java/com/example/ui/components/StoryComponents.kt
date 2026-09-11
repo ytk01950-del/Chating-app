@@ -42,22 +42,22 @@ import com.example.model.User
 import com.example.model.UserStoryGroup
 import com.example.ui.theme.AppTheme
 
-// Gradient for unread active stories (Instagram / Snapchat gradient style)
+// Monochrome gradients for stories
 val StoryActiveGradient = Brush.sweepGradient(
     listOf(
-        Color(0xFFFF8A00),
-        Color(0xFFE52E71),
-        Color(0xFF9B51E0),
-        Color(0xFF00C6FF),
-        Color(0xFFFF8A00)
+        Color(0xFFFFFFFF),
+        Color(0xFFCCCCCC),
+        Color(0xFFFFFFFF),
+        Color(0xFFE0E0E0),
+        Color(0xFFFFFFFF)
     )
 )
 
 val StorySeenGradient = Brush.sweepGradient(
     listOf(
+        Color(0xFF444444),
         Color(0xFF666666),
-        Color(0xFF888888),
-        Color(0xFF666666)
+        Color(0xFF444444)
     )
 )
 

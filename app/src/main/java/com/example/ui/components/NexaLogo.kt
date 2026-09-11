@@ -93,25 +93,25 @@ fun NexaSplashScreen(
         launch {
             alphaAnim.animateTo(
                 targetValue = 1f,
-                animationSpec = tween(durationMillis = 1000, easing = CubicBezierEasing(0.25f, 0.1f, 0.25f, 1f))
+                animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing)
             )
         }
-        // Smooth zoom-in animation
+        // Smooth zoom-in animation (70% to 100%)
         launch {
             scaleAnim.animateTo(
                 targetValue = 1f,
-                animationSpec = tween(durationMillis = 1200, easing = CubicBezierEasing(0.16f, 1f, 0.3f, 1f))
+                animationSpec = tween(durationMillis = 1100, easing = FastOutSlowInEasing)
             )
         }
         // Soft white glow fade-in
         launch {
             glowAlpha.animateTo(
                 targetValue = 0.85f,
-                animationSpec = tween(durationMillis = 1100, easing = FastOutSlowInEasing)
+                animationSpec = tween(durationMillis = 900, easing = FastOutSlowInEasing)
             )
         }
-        // Hold briefly for modern premium feel, then navigate to login screen
-        delay(1900)
+        // Brief hold to enjoy the logo before smoothly entering login
+        delay(1500)
         onAnimationFinished()
     }
 

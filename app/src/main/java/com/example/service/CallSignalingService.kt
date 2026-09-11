@@ -170,13 +170,18 @@ class CallSignalingService(
             database.getReference("user_active_calls").child(caller.id).setValue(callId).await()
             database.getReference("user_active_calls").child(receiver.id).setValue(callId).await()
 
-            // 3. Post call notification for receiver
+            // 3. Post rich high-priority call notification payload for receiver
             val notifPayload = mapOf(
                 "type" to "call",
+                "incoming_call" to "true",
                 "callId" to callId,
                 "callerId" to caller.id,
                 "callerName" to caller.displayName.ifBlank { caller.username },
+                "callerUsername" to caller.username,
+                "callerPhotoUrl" to (caller.photoUrl ?: ""),
+                "callerAvatarId" to caller.avatarId.toString(),
                 "callType" to callType.name,
+                "priority" to "high",
                 "timestamp" to now
             )
             database.getReference("notifications").child(receiver.id).child(callId).setValue(notifPayload)
@@ -229,6 +234,16 @@ class CallSignalingService(
                 call = call.copy(status = CallStatus.REJECTED.name, endedAt = now, durationSeconds = 0L)
             )
 
+            // Post rejected notification to dismiss incoming call on receiver
+            val rejectPayload = mapOf(
+                "type" to "call_rejected",
+                "callId" to call.callId,
+                "callerId" to call.callerId,
+                "callerName" to call.callerName,
+                "timestamp" to now
+            )
+            database.getReference("notifications").child(call.receiverId).child("rejected_${call.callId}").setValue(rejectPayload)
+
             Log.d(tag, "Call rejected: ${call.callId}")
             Result.success(Unit)
         } catch (e: Exception) {
@@ -277,6 +292,18 @@ class CallSignalingService(
                     durationSeconds = durationSec
                 )
             )
+
+            // Post missed or ended notification to receiver so background state updates
+            val notifType = if (finalStatus == CallStatus.MISSED.name) "call_missed" else "call_ended"
+            val endPayload = mapOf(
+                "type" to notifType,
+                "callId" to call.callId,
+                "callerId" to call.callerId,
+                "callerName" to call.callerName,
+                "callType" to call.callType,
+                "timestamp" to now
+            )
+            database.getReference("notifications").child(call.receiverId).child("ended_${call.callId}").setValue(endPayload)
 
             Log.d(tag, "Call ended: ${call.callId}, duration: ${durationSec}s, status: $finalStatus")
             Result.success(Unit)

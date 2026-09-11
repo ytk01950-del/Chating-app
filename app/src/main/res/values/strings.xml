@@ -1,3 +1,17 @@
 <resources>
     <string name="app_name">Nexa Messenger</string>
+    <string name="notification_channel_messages">Messages</string>
+    <string name="notification_channel_messages_desc">Notifications for incoming one-to-one chat messages</string>
+    <string name="notification_channel_audio_calls">Incoming Audio Calls</string>
+    <string name="notification_channel_audio_calls_desc">High-priority alerts and ringtones for incoming audio calls</string>
+    <string name="notification_channel_video_calls">Incoming Video Calls</string>
+    <string name="notification_channel_video_calls_desc">High-priority alerts and ringtones for incoming video calls</string>
+    <string name="notification_channel_missed_calls">Missed Calls</string>
+    <string name="notification_channel_missed_calls_desc">Alerts for missed audio and video calls</string>
+    <string name="call_action_accept">Accept</string>
+    <string name="call_action_decline">Decline</string>
+    <string name="incoming_audio_call">Incoming Audio Call</string>
+    <string name="incoming_video_call">Incoming Video Call</string>
+    <string name="missed_audio_call">Missed Audio Call</string>
+    <string name="missed_video_call">Missed Video Call</string>
 </resources>

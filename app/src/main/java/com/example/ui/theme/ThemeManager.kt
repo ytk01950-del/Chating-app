@@ -68,35 +68,35 @@ data class CustomAppColors(
     val isDark: Boolean
 )
 
-// Dark Mode: Pure Pitch Black (#000000) canvas with mandatory crisp White (#FFFFFF) for primary text and dark charcoal surfaces (#262626)
+// Dark Mode: Pure Pitch Black (#000000) canvas with mandatory crisp White (#FFFFFF) for primary text and dark charcoal surfaces (#121212)
 val DarkAppColors = CustomAppColors(
     background = Color(0xFF000000),       // Pure pitch black
     backgroundSecondary = Color(0xFF000000),
-    surface = Color(0xFF262626),          // Dark charcoal (#262626)
-    surfaceElevated = Color(0xFF262626),  // Dialogs & elevated surfaces (#262626)
-    surfaceVariant = Color(0xFF262626),   // Secondary button/chip containers (#262626)
-    surfaceHover = Color(0xFF333333),
-    border = Color(0xFF262626),           // Border matching charcoal surfaces
-    borderSubtle = Color(0xFF363636),
-    borderActive = Color(0xFF2563EB),     // Electric Royal Blue (#2563EB)
+    surface = Color(0xFF121212),          // Dark charcoal (#121212)
+    surfaceElevated = Color(0xFF181818),  // Dialogs & elevated surfaces (#181818)
+    surfaceVariant = Color(0xFF1E1E1E),   // Secondary button/chip containers (#1E1E1E)
+    surfaceHover = Color(0xFF2A2A2A),
+    border = Color(0xFF222222),           // Border matching charcoal surfaces
+    borderSubtle = Color(0xFF2E2E2E),
+    borderActive = Color(0xFFFFFFFF),     // Crisp White (#FFFFFF)
     textPrimary = Color(0xFFFFFFFF),       // Crisp Pure White (#FFFFFF)
-    textSecondary = Color(0xFFE2E8F0),     // Clear crisp white/light gray
-    textMuted = Color(0xFFA0AEC0),         // Subdued metadata
-    textDisabled = Color(0xFF718096),
-    accentOrange = Color(0xFF2563EB),      // Replaced with Electric Royal Blue (#2563EB)
-    accentOrangeLight = Color(0xFF3B82F6),
-    accentOrangeDark = Color(0xFF1D4ED8),
-    accentOrangePill = Color(0x332563EB),
-    bubbleMe = Color(0xFF2563EB),          // Electric Royal Blue (#2563EB)
-    bubbleMeText = Color(0xFFFFFFFF),
-    bubbleMeTime = Color(0xCCFFFFFF),
-    bubbleOther = Color(0xFF262626),       // Dark charcoal (#262626)
-    bubbleOtherBorder = Color(0xFF363636),
+    textSecondary = Color(0xFFCCCCCC),     // Clear crisp white/light gray
+    textMuted = Color(0xFF888888),         // Subdued metadata
+    textDisabled = Color(0xFF555555),
+    accentOrange = Color(0xFFFFFFFF),      // Monochrome Pure White
+    accentOrangeLight = Color(0xFFEEEEEE),
+    accentOrangeDark = Color(0xFFCCCCCC),
+    accentOrangePill = Color(0x33FFFFFF),
+    bubbleMe = Color(0xFFFFFFFF),          // Pure White Bubble
+    bubbleMeText = Color(0xFF000000),
+    bubbleMeTime = Color(0x99000000),
+    bubbleOther = Color(0xFF181818),       // Dark charcoal (#181818)
+    bubbleOtherBorder = Color(0xFF2E2E2E),
     bubbleOtherText = Color(0xFFFFFFFF),
-    bubbleOtherTime = Color(0xFFA0AEC0),
+    bubbleOtherTime = Color(0xFF888888),
     navBarBg = Color(0xF2000000),          // Pure Pitch Black bottom bar
-    navBarBorder = Color(0xFF262626),
-    cardBackground = Color(0xFF262626),    // Dark charcoal (#262626)
+    navBarBorder = Color(0xFF222222),
+    cardBackground = Color(0xFF121212),    // Dark charcoal (#121212)
     isDark = true
 )
 
@@ -110,16 +110,16 @@ val LightAppColors = CustomAppColors(
     surfaceHover = Color(0xFFE4E6EB),
     border = Color(0xFFDBDBDB),
     borderSubtle = Color(0xFFE5E5E5),
-    borderActive = Color(0xFF2563EB),     // Electric Royal Blue (#2563EB)
+    borderActive = Color(0xFF111111),     // Crisp Black (#111111)
     textPrimary = Color(0xFF111111),       // Crisp Pure Black (#111111)
     textSecondary = Color(0xFF555555),     // Dark charcoal
     textMuted = Color(0xFF8E8E8E),         // Subdued metadata
     textDisabled = Color(0xFFB0B0B0),
-    accentOrange = Color(0xFF2563EB),      // Electric Royal Blue (#2563EB)
-    accentOrangeLight = Color(0xFF3B82F6),
-    accentOrangeDark = Color(0xFF1D4ED8),
-    accentOrangePill = Color(0x222563EB),
-    bubbleMe = Color(0xFF2563EB),          // Electric Royal Blue (#2563EB)
+    accentOrange = Color(0xFF111111),      // Crisp Black (#111111)
+    accentOrangeLight = Color(0xFF333333),
+    accentOrangeDark = Color(0xFF000000),
+    accentOrangePill = Color(0x22000000),
+    bubbleMe = Color(0xFF111111),          // Crisp Black
     bubbleMeText = Color(0xFFFFFFFF),
     bubbleMeTime = Color(0xCCFFFFFF),
     bubbleOther = Color(0xFFEFEFEF),

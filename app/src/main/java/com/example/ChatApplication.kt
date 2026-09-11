@@ -33,8 +33,32 @@ class ChatApplication : Application() {
                 // Persistence already configured or active
             }
 
-            // Create Android notification channel for chat messages
-            com.example.util.WpChatNotificationHelper.createNotificationChannel(this)
+            // Create Android v3 notification channels for messages and calls
+            com.example.util.WpChatNotificationHelper.createNotificationChannels(this)
+
+            // Ensure Firebase Cloud Messaging auto-initialization
+            try {
+                com.google.firebase.messaging.FirebaseMessaging.getInstance().isAutoInitEnabled = true
+                com.google.firebase.messaging.FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+                    if (task.isSuccessful) {
+                        val token = task.result
+                        Log.i("ChatApplication", "FCM token retrieved at app startup: $token")
+                        if (!token.isNullOrBlank()) {
+                            com.example.service.WpChatMessagingService.saveCachedToken(this, token)
+                            val uid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+                            if (!uid.isNullOrBlank()) {
+                                val db = FirebaseDatabase.getInstance("https://chating-a9250-default-rtdb.firebaseio.com")
+                                db.getReference("fcm_tokens").child(uid).setValue(token)
+                                db.getReference("users").child(uid).child("fcmToken").setValue(token)
+                            }
+                        }
+                    } else {
+                        Log.w("ChatApplication", "FCM token retrieval failed: ${task.exception?.message}")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("ChatApplication", "FCM initialization note: ${e.message}")
+            }
 
             // Supabase client auto-initialization on app launch with built-in credentials
             com.example.service.SupabaseConfig.initialize(this)
