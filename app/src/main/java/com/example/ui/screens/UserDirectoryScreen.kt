@@ -494,48 +494,6 @@ private fun ChatsTabView(
                     )
                 }
             }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Filter Chips Row
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                item {
-                    AppFilterChip(
-                        selected = !isSearchUsersMode && !filterOnlineOnly,
-                        onClick = {
-                            onToggleSearchUsersMode(false)
-                            if (filterOnlineOnly) onToggleOnlineFilter()
-                        },
-                        label = "All Chats",
-                        badgeCount = users.size
-                    )
-                }
-                item {
-                    AppFilterChip(
-                        selected = !isSearchUsersMode && filterOnlineOnly,
-                        onClick = {
-                            onToggleSearchUsersMode(false)
-                            if (!filterOnlineOnly) onToggleOnlineFilter()
-                        },
-                        label = "Online",
-                        badgeCount = onlineCount,
-                        showOnlineDot = true
-                    )
-                }
-                item {
-                    AppFilterChip(
-                        selected = isSearchUsersMode,
-                        onClick = {
-                            onToggleSearchUsersMode(!isSearchUsersMode)
-                        },
-                        label = "Find @ChatID",
-                        badgeCount = if (searchResults.isNotEmpty()) searchResults.size else 0
-                    )
-                }
-            }
         }
 
         // Body Content

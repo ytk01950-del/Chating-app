@@ -140,7 +140,7 @@ fun AppPrimaryButton(
                 text = text,
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontSize = fontSize,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
                     letterSpacing = 0.2.sp
                 ),
                 color = if (enabled) contentColor else colors.textDisabled,
@@ -272,7 +272,7 @@ fun AppDestructiveButton(
                 Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(6.dp))
             }
-            Text(text = text, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Text(text = text, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
         }
     } else {
         OutlinedButton(
