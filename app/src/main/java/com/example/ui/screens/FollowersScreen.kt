@@ -416,12 +416,12 @@ fun FollowersScreen(
                         userToUnfollow = null
                     },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (colors.isDark) Color.White else Color(0xFF111111),
-                        contentColor = if (colors.isDark) Color.Black else Color.White
+                        containerColor = Color(0xFFDC2626),
+                        contentColor = Color.White
                     ),
                     shape = RoundedCornerShape(10.dp)
                 ) {
-                    Text("Unfollow", fontWeight = FontWeight.Bold)
+                    Text("Unfollow", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {

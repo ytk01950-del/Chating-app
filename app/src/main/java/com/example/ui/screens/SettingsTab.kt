@@ -116,7 +116,7 @@ fun SettingsTab(
     var readReceiptsEnabled by remember { mutableStateOf(true) }
     var pushNotificationsEnabled by remember { mutableStateOf(true) }
     var soundVibrationEnabled by remember { mutableStateOf(true) }
-    var selectedDisappearingDefault by remember { mutableIntStateOf(0) } // 0 = Keep, 1 = View Once, 2 = View Twice
+    var selectedDisappearingDefault by remember { mutableIntStateOf(0) } // 0 = View Once, 1 = View Twice
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -635,7 +635,7 @@ fun SettingsTab(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        listOf("Keep in Chat", "View Once", "View Twice").forEachIndexed { index, title ->
+                        listOf("View Once", "View Twice").forEachIndexed { index, title ->
                             val isSelected = selectedDisappearingDefault == index
                             Surface(
                                 modifier = Modifier

@@ -56,10 +56,15 @@
             android:screenOrientation="portrait"
             android:theme="@style/Theme.MyApplication" />
 
-        <!-- Foreground Service for Incoming Call Ringing -->
+        <!-- Foreground Service for Incoming Call Ringing & Signaling -->
         <service
             android:name=".service.IncomingCallRingingService"
-            android:exported="false"
+            android:exported="true"
+            android:foregroundServiceType="phoneCall" />
+
+        <service
+            android:name=".service.CallSignalingForegroundService"
+            android:exported="true"
             android:foregroundServiceType="phoneCall" />
 
         <!-- Notification Actions Broadcast Receiver -->
@@ -79,6 +84,9 @@
         <meta-data
             android:name="firebase_messaging_auto_init_enabled"
             android:value="true" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="nexa_messages_v4" />
         <meta-data
             android:name="firebase_analytics_collection_enabled"
             android:value="false" />

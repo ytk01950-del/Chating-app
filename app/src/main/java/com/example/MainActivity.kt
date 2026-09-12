@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -23,11 +24,14 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -35,7 +39,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -108,6 +115,16 @@ class MainActivity : ComponentActivity() {
         val callId = intent.getStringExtra(WpChatNotificationHelper.EXTRA_CALL_ID)
         val callAction = intent.getStringExtra(WpChatNotificationHelper.EXTRA_ACTION_CALL)
         if (!callId.isNullOrBlank()) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                setShowWhenLocked(true)
+                setTurnScreenOn(true)
+            }
+            @Suppress("DEPRECATION")
+            window.addFlags(
+                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
+                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+            )
             chatViewModel.handleCallFromIntent(callId, callAction ?: "incoming", this)
             return
         }
@@ -250,6 +267,11 @@ fun WpChatApp(
     ) { _ -> }
 
     LaunchedEffect(currentUser) {
+        currentUser?.id?.let { uid ->
+            if (uid.isNotBlank()) {
+                com.example.service.WpChatMessagingService.saveCurrentUserId(context, uid)
+            }
+        }
         if (currentUser != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val hasPermission = ContextCompat.checkSelfPermission(
                 context,
@@ -289,7 +311,28 @@ fun WpChatApp(
             )
         } else {
             Scaffold(
-                snackbarHost = { SnackbarHost(snackbarHostState) },
+                snackbarHost = {
+                    SnackbarHost(
+                        hostState = snackbarHostState,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    ) { snackbarData ->
+                        Snackbar(
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            containerColor = Color(0xFFF2F2F2),
+                            contentColor = Color.Black,
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(
+                                text = snackbarData.visuals.message,
+                                color = Color.Black,
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    color = Color.Black,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            )
+                        }
+                    }
+                },
                 modifier = Modifier.fillMaxSize()
             ) { paddingValues ->
             AnimatedContent(

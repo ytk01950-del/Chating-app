@@ -34,7 +34,9 @@ private val ModernDarkColorScheme = darkColorScheme(
     error = DarkError,
     onError = Color.White,
     errorContainer = DarkErrorContainer,
-    onErrorContainer = DarkError
+    onErrorContainer = DarkError,
+    inverseSurface = Color(0xFFF2F2F2),
+    inverseOnSurface = Color(0xFF111111)
 )
 
 private val ModernLightColorScheme = lightColorScheme(
@@ -60,7 +62,9 @@ private val ModernLightColorScheme = lightColorScheme(
     error = Color(0xFFDC2626),
     onError = Color.White,
     errorContainer = Color(0xFFFEE2E2),
-    onErrorContainer = Color(0xFF991B1B)
+    onErrorContainer = Color(0xFF991B1B),
+    inverseSurface = Color(0xFFF2F2F2),
+    inverseOnSurface = Color(0xFF111111)
 )
 
 @Composable

@@ -496,9 +496,10 @@ fun ProfileDetailsScreen(
                                         .pressScale()
                                         .testTag("edit_profile_self_button"),
                                     shape = RoundedCornerShape(14.dp),
+                                    border = if (colors.isDark) BorderStroke(1.dp, Color(0xFF3E3E3E)) else null,
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (colors.isDark) Color.White else Color(0xFF111111),
-                                        contentColor = if (colors.isDark) Color.Black else Color.White
+                                        containerColor = if (colors.isDark) Color(0xFF1E1E1E) else Color(0xFF111111),
+                                        contentColor = Color.White
                                     ),
                                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
                                 ) {
@@ -510,6 +511,7 @@ fun ProfileDetailsScreen(
                                         Icon(
                                             imageVector = Icons.Default.Edit,
                                             contentDescription = null,
+                                            tint = Color.White,
                                             modifier = Modifier.size(16.dp)
                                         )
                                         Spacer(modifier = Modifier.width(6.dp))
@@ -517,6 +519,7 @@ fun ProfileDetailsScreen(
                                             text = "Edit Profile",
                                             fontWeight = FontWeight.SemiBold,
                                             fontSize = 14.sp,
+                                            color = Color.White,
                                             maxLines = 1,
                                             softWrap = false,
                                             textAlign = TextAlign.Center
@@ -938,12 +941,12 @@ fun ProfileDetailsScreen(
                         showUnfollowDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (colors.isDark) Color.White else Color(0xFF111111),
-                        contentColor = if (colors.isDark) Color.Black else Color.White
+                        containerColor = Color(0xFFDC2626),
+                        contentColor = Color.White
                     ),
                     shape = RoundedCornerShape(10.dp)
                 ) {
-                    Text("Unfollow", fontWeight = FontWeight.Bold)
+                    Text("Unfollow", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {

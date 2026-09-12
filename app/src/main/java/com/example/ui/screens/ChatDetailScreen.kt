@@ -71,7 +71,6 @@ import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlayCircleFilled
-import androidx.compose.material.icons.filled.AllInclusive
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.LooksOne
 import androidx.compose.material.icons.filled.LooksTwo
@@ -760,7 +759,7 @@ fun ChatDetailScreen(
         }
     }
 
-    // Attachment Options Bottom Sheet
+    // Attachment Options Bottom Sheet (Photos and Videos only)
     if (showAttachmentSheet) {
         val sheetState = rememberModalBottomSheetState()
         ModalBottomSheet(
@@ -772,8 +771,8 @@ fun ChatDetailScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 8.dp)
-                    .padding(bottom = 24.dp)
+                    .padding(horizontal = 24.dp, vertical = 8.dp)
+                    .padding(bottom = 28.dp)
             ) {
                 Text(
                     text = "Share with ${otherUser.displayName}",
@@ -782,11 +781,11 @@ fun ChatDetailScreen(
                     color = TextPrimary
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.spacedBy(36.dp, Alignment.CenterHorizontally)
                 ) {
                     AppAttachmentGridItem(
                         icon = Icons.Default.Image,
@@ -808,64 +807,6 @@ fun ChatDetailScreen(
                             pickVideoLauncher.launch(
                                 PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)
                             )
-                        }
-                    )
-                    AppAttachmentGridItem(
-                        icon = Icons.Default.Description,
-                        label = "Document",
-                        accentColor = Color(0xFF81C784),
-                        onClick = {
-                            showAttachmentSheet = false
-                            pickDocumentLauncher.launch(
-                                arrayOf(
-                                    "application/pdf",
-                                    "application/msword",
-                                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                                    "text/plain"
-                                )
-                            )
-                        }
-                    )
-                    AppAttachmentGridItem(
-                        icon = Icons.Default.Audiotrack,
-                        label = "Audio",
-                        accentColor = Color(0xFFBA68C8),
-                        onClick = {
-                            showAttachmentSheet = false
-                            pickAudioLauncher.launch(arrayOf("audio/*"))
-                        }
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Start
-                ) {
-                    AppAttachmentGridItem(
-                        icon = Icons.Default.FolderZip,
-                        label = "ZIP Archive",
-                        accentColor = Color(0xFFFFD54F),
-                        onClick = {
-                            showAttachmentSheet = false
-                            pickZipLauncher.launch(
-                                arrayOf(
-                                    "application/zip",
-                                    "application/x-zip-compressed",
-                                    "application/octet-stream"
-                                )
-                            )
-                        }
-                    )
-                    Spacer(modifier = Modifier.width(28.dp))
-                    AppAttachmentGridItem(
-                        icon = Icons.Default.AttachFile,
-                        label = "Any File",
-                        accentColor = Color(0xFF4DB6AC),
-                        onClick = {
-                            showAttachmentSheet = false
-                            pickAnyFileLauncher.launch(arrayOf("*/*"))
                         }
                     )
                 }
@@ -954,8 +895,8 @@ fun AttachmentConfirmDialog(
     onSend: (caption: String, viewLimit: Int, allowDownload: Boolean) -> Unit
 ) {
     var caption by remember { mutableStateOf("") }
-    // View Limit: 0 = Keep in chat, 1 = View Once, 2 = View Twice
-    var viewLimit by remember { mutableIntStateOf(if (meta.messageType == MessageType.IMAGE || meta.messageType == MessageType.VIDEO) 0 else 0) }
+    // View Limit: 1 = View Once (default), 2 = View Twice
+    var viewLimit by remember { mutableIntStateOf(1) }
     var allowDownload by remember { mutableStateOf(false) }
 
     Dialog(
@@ -1133,17 +1074,9 @@ fun AttachmentConfirmDialog(
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        // Keep in Chat (0)
-                        FilterChipOption(
-                            text = "Keep in Chat",
-                            icon = Icons.Default.AllInclusive,
-                            isSelected = viewLimit == 0,
-                            onClick = { viewLimit = 0 },
-                            modifier = Modifier.weight(1f)
-                        )
-                        // View Once (1)
+                        // View Once (1) - Default
                         FilterChipOption(
                             text = "View Once",
                             icon = Icons.Default.LooksOne,
@@ -1817,6 +1750,8 @@ fun DisappearingMediaViewerDialog(
     var secondsLeft by remember { mutableIntStateOf(totalSeconds) }
     val resolvedType = message.getResolvedType()
 
+    val willExpire = message.viewLimit <= 1 || (message.currentViews + 1 >= message.viewLimit)
+
     // Mark viewed immediately upon opening
     LaunchedEffect(message.id) {
         onMarkViewed()
@@ -1828,7 +1763,9 @@ fun DisappearingMediaViewerDialog(
             delay(1000L)
             secondsLeft -= 1
         }
-        onExpire()
+        if (willExpire) {
+            onExpire()
+        }
         onDismiss()
     }
 
@@ -1836,7 +1773,9 @@ fun DisappearingMediaViewerDialog(
 
     Dialog(
         onDismissRequest = {
-            onExpire()
+            if (willExpire) {
+                onExpire()
+            }
             onDismiss()
         },
         properties = DialogProperties(
@@ -1986,7 +1925,9 @@ fun DisappearingMediaViewerDialog(
                                 icon = Icons.Default.Close,
                                 contentDescription = "Close",
                                 onClick = {
-                                    onExpire()
+                                    if (willExpire) {
+                                        onExpire()
+                                    }
                                     onDismiss()
                                 },
                                 tint = Color.White,

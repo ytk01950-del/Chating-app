@@ -23,13 +23,14 @@ import com.example.MainActivity
 import com.example.model.CallDirection
 import com.example.model.CallRecord
 import com.example.model.CallStatus
+import com.example.ui.screens.IncomingCallActivity
 import com.example.util.WpChatNotificationHelper
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 
-class IncomingCallRingingService : Service() {
+open class IncomingCallRingingService : Service() {
 
     private var mediaPlayer: MediaPlayer? = null
     private var vibrator: Vibrator? = null
@@ -332,11 +333,23 @@ class IncomingCallRingingService : Service() {
         try {
             val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
             wakeLock = powerManager?.newWakeLock(
-                PowerManager.PARTIAL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
-                "Nexa:IncomingCallRingingWakeLock"
+                PowerManager.PARTIAL_WAKE_LOCK,
+                "Nexa:IncomingCallCpuWakeLock"
             )
             wakeLock?.acquire(45_000L)
-            Log.d(TAG, "WakeLock acquired for incoming call")
+            Log.d(TAG, "CPU WakeLock acquired for incoming call")
+
+            // Wake up and turn screen on for incoming call
+            try {
+                @Suppress("DEPRECATION")
+                val screenWakeLock = powerManager?.newWakeLock(
+                    PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
+                    "Nexa:IncomingCallScreenWakeLock"
+                )
+                screenWakeLock?.acquire(10_000L)
+            } catch (e: Exception) {
+                Log.w(TAG, "Screen wake lock note: ${e.message}")
+            }
         } catch (e: Exception) {
             Log.w(TAG, "Failed to acquire WakeLock: ${e.message}")
         }
@@ -361,6 +374,26 @@ class IncomingCallRingingService : Service() {
             )
         } else {
             startForeground(NOTIFICATION_ID, notification)
+        }
+
+        // Launch IncomingCallActivity directly as foreground phoneCall service
+        try {
+            val activityIntent = Intent(applicationContext, IncomingCallActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                        Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                        Intent.FLAG_ACTIVITY_SINGLE_TOP
+                putExtra(WpChatNotificationHelper.EXTRA_CALL_ID, callId)
+                putExtra(WpChatNotificationHelper.EXTRA_CALLER_ID, callerId)
+                putExtra(WpChatNotificationHelper.EXTRA_CALLER_NAME, callerName)
+                putExtra(WpChatNotificationHelper.EXTRA_CALLER_USERNAME, callerUsername)
+                putExtra(WpChatNotificationHelper.EXTRA_CALLER_PHOTO, callerPhotoUrl)
+                putExtra(WpChatNotificationHelper.EXTRA_CALLER_AVATAR, callerAvatarId)
+                putExtra(WpChatNotificationHelper.EXTRA_CALL_TYPE, callType)
+            }
+            applicationContext.startActivity(activityIntent)
+            Log.i(TAG, "IncomingCallActivity launched directly from phoneCall foreground service")
+        } catch (e: Exception) {
+            Log.w(TAG, "Direct launch of IncomingCallActivity note: ${e.message}")
         }
 
         // 3. Start Ringtone Audio Loop
@@ -587,3 +620,10 @@ class IncomingCallRingingService : Service() {
         super.onDestroy()
     }
 }
+
+/**
+ * Foreground Service for call signaling and background delivery.
+ * Registered in AndroidManifest with foregroundServiceType="phoneCall".
+ */
+class CallSignalingForegroundService : IncomingCallRingingService()
+

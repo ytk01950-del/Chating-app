@@ -681,8 +681,8 @@ class ChatViewModel(
         fileUri: Uri,
         forcedType: MessageType? = null,
         caption: String = "",
-        viewLimit: Int = 0,
-        allowDownload: Boolean = true,
+        viewLimit: Int = 1,
+        allowDownload: Boolean = false,
         context: Context
     ) {
         val user = _currentUser.value ?: return
@@ -1003,7 +1003,7 @@ class ChatViewModel(
         viewModelScope.launch {
             val result = repository.unfollowUser(current.id, targetUser.id)
             result.onSuccess {
-                _infoMessage.value = "Unfollowed ${targetUser.displayName.ifBlank { targetUser.username }}"
+                _infoMessage.value = "Unfollowed @${targetUser.username.ifBlank { targetUser.displayName }}"
             }.onFailure { err ->
                 // Rollback optimistic update
                 _followedUserIds.value = _followedUserIds.value + targetUser.id

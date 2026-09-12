@@ -22,18 +22,22 @@ object WpChatNotificationHelper {
 
     private const val TAG = "WpChatNotification"
 
-    // Version 3 Notification Channels
-    const val CHANNEL_ID_MESSAGES = "nexa_messages_v3"
-    const val CHANNEL_ID_AUDIO_CALLS = "nexa_incoming_audio_calls_v3"
-    const val CHANNEL_ID_VIDEO_CALLS = "nexa_incoming_video_calls_v3"
-    const val CHANNEL_ID_MISSED_CALLS = "nexa_missed_calls_v3"
+    // Version 4 Notification Channels (High Priority & Heads-Up Alerting)
+    const val CHANNEL_ID_MESSAGES = "nexa_messages_v4"
+    const val CHANNEL_ID_AUDIO_CALLS = "nexa_incoming_audio_calls_v4"
+    const val CHANNEL_ID_VIDEO_CALLS = "nexa_incoming_video_calls_v4"
+    const val CHANNEL_ID_MISSED_CALLS = "nexa_missed_calls_v4"
 
     // Legacy Channels for cleanup
     private val LEGACY_CHANNELS = listOf(
         "wpchat_messages_channel",
         "wpchat_calls_channel",
         "nexa_messages_channel_v2",
-        "nexa_calls_channel_v2"
+        "nexa_calls_channel_v2",
+        "nexa_messages_v3",
+        "nexa_incoming_audio_calls_v3",
+        "nexa_incoming_video_calls_v3",
+        "nexa_missed_calls_v3"
     )
 
     const val EXTRA_USER_ID = "extra_chat_user_id"
@@ -84,7 +88,7 @@ object WpChatNotificationHelper {
                 .setUsage(AudioAttributes.USAGE_NOTIFICATION)
                 .build()
 
-            // 2. Messages Channel
+            // 2. Messages Channel (NotificationManager.IMPORTANCE_HIGH)
             val msgChannel = NotificationChannel(
                 CHANNEL_ID_MESSAGES,
                 context.getString(R.string.notification_channel_messages),
@@ -96,15 +100,15 @@ object WpChatNotificationHelper {
                 vibrationPattern = MESSAGE_VIBRATION_PATTERN
                 setSound(defaultNotifSoundUri, messageAudioAttributes)
                 setShowBadge(true)
-                lockscreenVisibility = Notification.VISIBILITY_PRIVATE
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             }
             notificationManager.createNotificationChannel(msgChannel)
 
-            // 3. Incoming Audio Calls Channel (Importance MAX with Ringtone)
+            // 3. Incoming Audio Calls Channel (IMPORTANCE_HIGH with sound, vibration, and VISIBILITY_PUBLIC)
             val audioCallChannel = NotificationChannel(
                 CHANNEL_ID_AUDIO_CALLS,
                 context.getString(R.string.notification_channel_audio_calls),
-                NotificationManager.IMPORTANCE_MAX
+                NotificationManager.IMPORTANCE_HIGH
             ).apply {
                 description = context.getString(R.string.notification_channel_audio_calls_desc)
                 enableLights(true)
@@ -119,11 +123,11 @@ object WpChatNotificationHelper {
             }
             notificationManager.createNotificationChannel(audioCallChannel)
 
-            // 4. Incoming Video Calls Channel (Importance MAX with Ringtone)
+            // 4. Incoming Video Calls Channel (IMPORTANCE_HIGH with sound, vibration, and VISIBILITY_PUBLIC)
             val videoCallChannel = NotificationChannel(
                 CHANNEL_ID_VIDEO_CALLS,
                 context.getString(R.string.notification_channel_video_calls),
-                NotificationManager.IMPORTANCE_MAX
+                NotificationManager.IMPORTANCE_HIGH
             ).apply {
                 description = context.getString(R.string.notification_channel_video_calls_desc)
                 enableLights(true)
@@ -138,7 +142,7 @@ object WpChatNotificationHelper {
             }
             notificationManager.createNotificationChannel(videoCallChannel)
 
-            // 5. Missed Calls Channel
+            // 5. Missed Calls Channel (IMPORTANCE_HIGH)
             val missedCallChannel = NotificationChannel(
                 CHANNEL_ID_MISSED_CALLS,
                 context.getString(R.string.notification_channel_missed_calls),
@@ -150,11 +154,11 @@ object WpChatNotificationHelper {
                 vibrationPattern = MESSAGE_VIBRATION_PATTERN
                 setSound(defaultNotifSoundUri, messageAudioAttributes)
                 setShowBadge(true)
-                lockscreenVisibility = Notification.VISIBILITY_PRIVATE
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             }
             notificationManager.createNotificationChannel(missedCallChannel)
 
-            Log.i(TAG, "All v3 notification channels initialized successfully with sound & vibration.")
+            Log.i(TAG, "All v4 high-priority notification channels initialized successfully.")
         }
     }
 
@@ -410,6 +414,9 @@ object WpChatNotificationHelper {
         val title = senderName.ifBlank { "New Message" }
         val body = messageText.ifBlank { "Sent you a message" }
 
+        val defaultSoundUri: Uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+
         val notification = NotificationCompat.Builder(context, CHANNEL_ID_MESSAGES)
             .setSmallIcon(android.R.drawable.stat_notify_chat)
             .setContentTitle(title)
@@ -417,9 +424,11 @@ object WpChatNotificationHelper {
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
-            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
-            .setAutoCancel(true)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setSound(defaultSoundUri)
             .setVibrate(MESSAGE_VIBRATION_PATTERN)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .build()
 

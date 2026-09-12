@@ -928,8 +928,10 @@ class FirebaseChatRepository {
                 database.getReference("message_requests").child(receiverId).child(sender.id).setValue(request)
             }
 
-            // 3. Post notification payload for recipient
+            // 3. Post notification payload for recipient (high-priority message alert)
             val notifPayload = mapOf(
+                "type" to "message",
+                "priority" to "high",
                 "messageId" to msgId,
                 "chatId" to chatId,
                 "senderId" to sender.id,
@@ -1017,6 +1019,7 @@ class FirebaseChatRepository {
             if (shouldExpire) {
                 updates["isExpired"] = true
                 updates["fileUrl"] = "" // Clear file URL to purge from database record
+                updates["thumbnailUrl"] = ""
             }
 
             msgRef.updateChildren(updates).await()
@@ -1043,7 +1046,8 @@ class FirebaseChatRepository {
 
             val updates = mapOf<String, Any>(
                 "isExpired" to true,
-                "fileUrl" to ""
+                "fileUrl" to "",
+                "thumbnailUrl" to ""
             )
             msgRef.updateChildren(updates).await()
 
@@ -1581,7 +1585,7 @@ class FirebaseChatRepository {
                 onSuccess = { downloadUrl ->
                     Log.d(tag, "Chat media uploaded to Supabase. Download URL: $downloadUrl")
 
-                    val isDisappearing = viewLimit > 0
+                    val resolvedLimit = if (viewLimit in 1..2) viewLimit else 1
                     val message = ChatMessage(
                         id = msgId,
                         senderId = sender.id,
@@ -1596,8 +1600,8 @@ class FirebaseChatRepository {
                         fileUrl = downloadUrl,
                         mimeType = meta.mimeType,
                         fileSize = fileBytes.size.toLong(),
-                        isTemporary = isDisappearing,
-                        viewLimit = viewLimit,
+                        isTemporary = true,
+                        viewLimit = resolvedLimit,
                         currentViews = 0,
                         allowDownload = allowDownload
                     )
@@ -1637,8 +1641,10 @@ class FirebaseChatRepository {
                         database.getReference("message_requests").child(receiverId).child(sender.id).setValue(request)
                     }
 
-                    // 3. Post notification payload
+                    // 3. Post notification payload (high priority media message)
                     val notifPayload = mapOf(
+                        "type" to "message",
+                        "priority" to "high",
                         "messageId" to msgId,
                         "chatId" to chatId,
                         "senderId" to sender.id,
