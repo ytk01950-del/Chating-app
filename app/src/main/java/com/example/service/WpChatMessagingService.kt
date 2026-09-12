@@ -65,6 +65,9 @@ class WpChatMessagingService : FirebaseMessagingService() {
         }
 
         try {
+            // Ensure notification channels are registered even when process was started cold by FCM
+            WpChatNotificationHelper.createNotificationChannels(applicationContext)
+
             val data = remoteMessage.data
             val isHighPriority = remoteMessage.priority == RemoteMessage.PRIORITY_HIGH ||
                     remoteMessage.originalPriority == RemoteMessage.PRIORITY_HIGH ||
@@ -73,7 +76,6 @@ class WpChatMessagingService : FirebaseMessagingService() {
             Log.i(tag, "FCM Message Received [HighPriority=$isHighPriority, Priority=${remoteMessage.priority}, from=${remoteMessage.from}]: data=$data")
 
             val notifType = (data["type"] ?: data["notificationType"] ?: data["messageType"] ?: data["action"] ?: "").lowercase()
-            val currentUserId = getCurrentUserId(applicationContext)
 
             // 2. Handle Call Cancelled / Ended / Rejected
             if (notifType == "call_ended" || notifType == "call_canceled" || notifType == "call_cancelled" || notifType == "call_rejected") {
@@ -86,7 +88,7 @@ class WpChatMessagingService : FirebaseMessagingService() {
 
             // 3. Handle Missed Call notification
             if (notifType == "call_missed" || notifType == "missed_call") {
-                val callId = data["callId"] ?: data["call_id"].orEmpty()
+                val callId = (data["callId"] ?: data["call_id"]).orEmpty().ifBlank { "missed_${System.currentTimeMillis()}" }
                 val callerId = data["callerId"] ?: data["caller_id"] ?: data["senderId"].orEmpty()
                 val callerName = (data["callerName"] ?: data["caller_name"] ?: data["senderName"]).orEmpty().ifBlank { "Nexa User" }
                 val callType = data["callType"] ?: data["call_type"] ?: "AUDIO"
@@ -116,7 +118,7 @@ class WpChatMessagingService : FirebaseMessagingService() {
                     (data.containsKey("callId") && !data.containsKey("messageId") && !notifType.startsWith("call_"))
 
             if (isIncomingCall) {
-                val callId = data["callId"] ?: data["call_id"].orEmpty()
+                val callId = (data["callId"] ?: data["call_id"]).orEmpty().ifBlank { "call_${System.currentTimeMillis()}" }
                 val callerId = data["callerId"] ?: data["caller_id"] ?: data["senderId"].orEmpty()
                 val callerName = (data["callerName"] ?: data["caller_name"] ?: data["senderName"]).orEmpty().ifBlank { "Incoming Caller" }
                 val callerUsername = data["callerUsername"] ?: data["caller_username"].orEmpty()
@@ -128,28 +130,10 @@ class WpChatMessagingService : FirebaseMessagingService() {
                 val callType = data["callType"] ?: data["call_type"]
                     ?: if (notifType == "video_call" || notifType.contains("video")) "VIDEO" else "AUDIO"
 
-                if (callerId.isNotBlank() && currentUserId.isNotBlank() && callerId == currentUserId) {
-                    Log.d(tag, "Ignoring incoming call from self ($callerId)")
-                    return
-                }
+                Log.i(tag, "Dispatching incoming call notification immediately: $callId from $callerName ($callType)")
 
-                if (callId.isBlank()) {
-                    Log.w(tag, "Incoming call payload missing callId, cannot proceed.")
-                    return
-                }
-
-                Log.i(tag, "Launching high-priority Foreground Service for incoming call: $callId from $callerName ($callType)")
-
-                // Update call status to RINGING in Firebase RTDB so caller sees 'Ringing...' immediately
-                try {
-                    val db = FirebaseDatabase.getInstance(databaseUrl)
-                    db.getReference("calls").child(callId).child("status").setValue("RINGING")
-                } catch (e: Exception) {
-                    Log.w(tag, "Failed to update call status to RINGING: ${e.message}")
-                }
-
-                // Launch high-priority Notification with FullScreenIntent immediately using Foreground Service
-                IncomingCallRingingService.startRinging(
+                // Bypass UI dependency and immediately show incoming call notification
+                WpChatNotificationHelper.showIncomingCallNotification(
                     context = applicationContext,
                     callId = callId,
                     callerId = callerId,
@@ -159,43 +143,51 @@ class WpChatMessagingService : FirebaseMessagingService() {
                     callerAvatarId = callerAvatarId,
                     callType = callType
                 )
+
+                // Update call status to RINGING in Firebase RTDB asynchronously
+                try {
+                    val db = FirebaseDatabase.getInstance(databaseUrl)
+                    db.getReference("calls").child(callId).child("status").setValue("RINGING")
+                } catch (e: Exception) {
+                    Log.w(tag, "Call status update note: ${e.message}")
+                }
+
+                // Launch high-priority Foreground Service with FullScreenIntent
+                try {
+                    IncomingCallRingingService.startRinging(
+                        context = applicationContext,
+                        callId = callId,
+                        callerId = callerId,
+                        callerName = callerName,
+                        callerUsername = callerUsername,
+                        callerPhotoUrl = callerPhotoUrl,
+                        callerAvatarId = callerAvatarId,
+                        callType = callType
+                    )
+                } catch (e: Exception) {
+                    Log.w(tag, "Foreground ringing service start note: ${e.message}")
+                }
                 return
             }
 
             // 5. Handle Chat Message Notification (type == "message")
-            val isChatMessage = notifType == "message" ||
-                    notifType == "chat" ||
-                    notifType == "text" ||
-                    notifType == "new_message" ||
-                    data.containsKey("messageId") ||
-                    data.containsKey("chatId") ||
-                    remoteMessage.notification != null
+            val senderId = data["senderId"] ?: data["fromUserId"] ?: data["sender_id"] ?: data["userId"].orEmpty()
+            val notifTitle = remoteMessage.notification?.title.orEmpty()
+            val notifBody = remoteMessage.notification?.body.orEmpty()
+            val senderName = (data["senderName"] ?: data["sender_name"] ?: data["fromUserName"] ?: notifTitle).ifBlank { "Nexa User" }
+            val chatId = (data["chatId"] ?: data["chat_id"]).orEmpty().ifBlank { senderId }
+            val messageId = (data["messageId"] ?: data["message_id"] ?: remoteMessage.messageId).orEmpty().ifBlank { "msg_${System.currentTimeMillis()}" }
+            val text = (data["text"] ?: data["message"] ?: data["body"] ?: notifBody).ifBlank { "New message received" }
 
-            if (isChatMessage) {
-                val senderId = data["senderId"] ?: data["fromUserId"] ?: data["sender_id"] ?: data["userId"].orEmpty()
-                val notifTitle = remoteMessage.notification?.title.orEmpty()
-                val notifBody = remoteMessage.notification?.body.orEmpty()
-                val senderName = (data["senderName"] ?: data["sender_name"] ?: data["fromUserName"] ?: notifTitle).ifBlank { "Nexa User" }
-                val chatId = data["chatId"] ?: data["chat_id"].orEmpty()
-                val messageId = data["messageId"] ?: data["message_id"] ?: remoteMessage.messageId ?: "msg_${System.currentTimeMillis()}"
-                val text = (data["text"] ?: data["message"] ?: data["body"] ?: notifBody).ifBlank { "New message received" }
-
-                // Do not notify sender about their own message
-                if (senderId.isNotBlank() && currentUserId.isNotBlank() && senderId == currentUserId) {
-                    Log.d(tag, "Ignoring message notification for self ($senderId)")
-                    return
-                }
-
-                Log.i(tag, "Displaying heads-up chat notification for sender: $senderName, messageId: $messageId")
-                WpChatNotificationHelper.showMessageNotification(
-                    context = applicationContext,
-                    senderId = senderId,
-                    senderName = senderName,
-                    chatId = chatId,
-                    messageId = messageId,
-                    messageText = text
-                )
-            }
+            Log.i(tag, "Bypassing UI dependency and immediately displaying heads-up chat notification for: $senderName, messageId: $messageId")
+            WpChatNotificationHelper.showMessageNotification(
+                context = applicationContext,
+                senderId = senderId,
+                senderName = senderName,
+                chatId = chatId,
+                messageId = messageId,
+                messageText = text
+            )
         } finally {
             try {
                 if (wakeLock?.isHeld == true) {

@@ -165,7 +165,8 @@ object WpChatNotificationHelper {
     fun isMessageAlreadyNotified(context: Context, messageId: String): Boolean {
         if (messageId.isBlank()) return false
         val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return prefs.contains(KEY_SEEN_MSG_PREFIX + messageId)
+        val timestamp = prefs.getLong(KEY_SEEN_MSG_PREFIX + messageId, 0L)
+        return timestamp > 0 && (System.currentTimeMillis() - timestamp < 4_000L)
     }
 
     fun markMessageAsNotified(context: Context, messageId: String) {
