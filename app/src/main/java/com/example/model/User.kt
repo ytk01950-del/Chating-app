@@ -14,7 +14,16 @@ data class User(
     val lastSeen: Long = System.currentTimeMillis(),
     val createdAt: Long = System.currentTimeMillis(),
     val storiesCount: Int = 0,
-    val postsCount: Int = 0
+    val postsCount: Int = 0,
+    val website: String = "",
+    val dateOfBirth: String = "",
+    val followersCount: Int = 0,
+    val followingCount: Int = 0,
+    val whoCanFollow: String = "Everyone", // "Everyone", "Followers Only", "Private"
+    val showFollowersCount: Boolean = true,
+    val showFollowingCount: Boolean = true,
+    val showFollowingList: Boolean = true,
+    val showDateOfBirth: String = "Everyone" // "Everyone", "Followers", "Only Me"
 ) {
     fun getInitials(): String {
         val names = displayName.trim().split(" ").filter { it.isNotBlank() }

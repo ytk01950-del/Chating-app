@@ -33,7 +33,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -47,7 +50,11 @@ enum class NavigationTab(val title: String, val icon: ImageVector, val tag: Stri
     CHATS("Chats", Icons.AutoMirrored.Filled.Chat, "nav_tab_chats"),
     CALLS("Calls", Icons.Default.Call, "nav_tab_calls"),
     STORIES("Stories", Icons.Default.AutoAwesome, "nav_tab_stories"),
-    SETTINGS("You", Icons.Default.Person, "nav_tab_settings")
+    PROFILE("Profile", Icons.Default.Person, "nav_tab_profile");
+
+    companion object {
+        val SETTINGS get() = PROFILE
+    }
 }
 
 @Composable
@@ -117,6 +124,20 @@ fun FloatingBottomNavBar(
                         label = "tab_content_color"
                     )
 
+                    val tabInteractionSource = remember { MutableInteractionSource() }
+                    val isTabPressed by tabInteractionSource.collectIsPressedAsState()
+                    val tabScale by animateFloatAsState(
+                        targetValue = if (isTabPressed) 0.94f else 1f,
+                        animationSpec = PremiumPressSpringSpec,
+                        label = "tab_press_scale"
+                    )
+
+                    val iconScale by animateFloatAsState(
+                        targetValue = if (isSelected) 1.08f else 1.0f,
+                        animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow),
+                        label = "tab_icon_scale"
+                    )
+
                     Surface(
                         shape = RoundedCornerShape(24.dp),
                         color = animatedBgColor,
@@ -124,9 +145,9 @@ fun FloatingBottomNavBar(
                         modifier = Modifier
                             .weight(1f)
                             .height(52.dp)
-                            .clip(RoundedCornerShape(24.dp))
+                            .scale(tabScale)
                             .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
+                                interactionSource = tabInteractionSource,
                                 indication = null
                             ) {
                                 onTabSelected(tab)
@@ -145,7 +166,9 @@ fun FloatingBottomNavBar(
                                     imageVector = tab.icon,
                                     contentDescription = tab.title,
                                     tint = animatedContentColor,
-                                    modifier = Modifier.size(22.dp)
+                                    modifier = Modifier
+                                        .size(22.dp)
+                                        .scale(iconScale)
                                 )
 
                                 // Badges
@@ -199,7 +222,7 @@ fun FloatingBottomNavBar(
                                             )
                                         }
                                     }
-                                    NavigationTab.SETTINGS -> {}
+                                    NavigationTab.PROFILE -> {}
                                 }
                             }
 

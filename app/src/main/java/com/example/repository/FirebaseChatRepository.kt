@@ -592,6 +592,225 @@ class FirebaseChatRepository {
     }
 
     // -------------------------------------------------------------
+    // FOLLOWERS & FOLLOWING SOCIAL GRAPH
+    // -------------------------------------------------------------
+
+    fun observeUserProfile(userId: String): Flow<User?> = callbackFlow {
+        if (userId.isBlank()) {
+            trySend(null)
+            close()
+            return@callbackFlow
+        }
+        val userRef = database.getReference("users").child(userId)
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val user = snapshot.getValue(User::class.java)
+                trySend(user?.let { sanitizePublicUser(it) })
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                trySend(null)
+            }
+        }
+        userRef.addValueEventListener(listener)
+        awaitClose { userRef.removeEventListener(listener) }
+    }
+
+    fun observeFollowingUserIds(userId: String): Flow<Set<String>> = callbackFlow {
+        if (userId.isBlank()) {
+            trySend(emptySet())
+            close()
+            return@callbackFlow
+        }
+        val followingRef = database.getReference("following").child(userId)
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val ids = snapshot.children.mapNotNull { it.key }.toSet()
+                trySend(ids)
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                trySend(emptySet())
+            }
+        }
+        followingRef.addValueEventListener(listener)
+        awaitClose { followingRef.removeEventListener(listener) }
+    }
+
+    fun observeFollowersUserIds(userId: String): Flow<Set<String>> = callbackFlow {
+        if (userId.isBlank()) {
+            trySend(emptySet())
+            close()
+            return@callbackFlow
+        }
+        val followersRef = database.getReference("followers").child(userId)
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val ids = snapshot.children.mapNotNull { it.key }.toSet()
+                trySend(ids)
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                trySend(emptySet())
+            }
+        }
+        followersRef.addValueEventListener(listener)
+        awaitClose { followersRef.removeEventListener(listener) }
+    }
+
+    fun observeFollowers(userId: String): Flow<List<User>> = callbackFlow {
+        if (userId.isBlank()) {
+            trySend(emptyList())
+            close()
+            return@callbackFlow
+        }
+        val followersRef = database.getReference("followers").child(userId)
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val followerUids = snapshot.children.mapNotNull { it.key }
+                if (followerUids.isEmpty()) {
+                    trySend(emptyList())
+                    return
+                }
+
+                val usersList = mutableListOf<User>()
+                var remaining = followerUids.size
+
+                for (uid in followerUids) {
+                    database.getReference("users").child(uid).get().addOnCompleteListener { task ->
+                        if (task.isSuccessful) {
+                            val user = task.result?.getValue(User::class.java)
+                            if (user != null && user.id.isNotBlank()) {
+                                synchronized(usersList) {
+                                    usersList.add(sanitizePublicUser(user))
+                                }
+                            }
+                        }
+                        remaining--
+                        if (remaining <= 0) {
+                            trySend(usersList.sortedBy { it.displayName.ifBlank { it.username } })
+                        }
+                    }
+                }
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                trySend(emptyList())
+            }
+        }
+        followersRef.addValueEventListener(listener)
+        awaitClose { followersRef.removeEventListener(listener) }
+    }
+
+    fun observeFollowing(userId: String): Flow<List<User>> = callbackFlow {
+        if (userId.isBlank()) {
+            trySend(emptyList())
+            close()
+            return@callbackFlow
+        }
+        val followingRef = database.getReference("following").child(userId)
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val followingUids = snapshot.children.mapNotNull { it.key }
+                if (followingUids.isEmpty()) {
+                    trySend(emptyList())
+                    return
+                }
+
+                val usersList = mutableListOf<User>()
+                var remaining = followingUids.size
+
+                for (uid in followingUids) {
+                    database.getReference("users").child(uid).get().addOnCompleteListener { task ->
+                        if (task.isSuccessful) {
+                            val user = task.result?.getValue(User::class.java)
+                            if (user != null && user.id.isNotBlank()) {
+                                synchronized(usersList) {
+                                    usersList.add(sanitizePublicUser(user))
+                                }
+                            }
+                        }
+                        remaining--
+                        if (remaining <= 0) {
+                            trySend(usersList.sortedBy { it.displayName.ifBlank { it.username } })
+                        }
+                    }
+                }
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                trySend(emptyList())
+            }
+        }
+        followingRef.addValueEventListener(listener)
+        awaitClose { followingRef.removeEventListener(listener) }
+    }
+
+    suspend fun followUser(currentUserId: String, targetUserId: String): Result<Unit> {
+        if (currentUserId.isBlank() || targetUserId.isBlank() || currentUserId == targetUserId) {
+            return Result.failure(IllegalArgumentException("Invalid user IDs for follow action"))
+        }
+        return try {
+            val now = System.currentTimeMillis()
+            val updates = hashMapOf<String, Any>(
+                "following/$currentUserId/$targetUserId" to now,
+                "followers/$targetUserId/$currentUserId" to now
+            )
+            database.reference.updateChildren(updates).await()
+
+            // Update user counters in database
+            updateFollowCounts(currentUserId)
+            updateFollowCounts(targetUserId)
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(tag, "Error following user: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun unfollowUser(currentUserId: String, targetUserId: String): Result<Unit> {
+        if (currentUserId.isBlank() || targetUserId.isBlank() || currentUserId == targetUserId) {
+            return Result.failure(IllegalArgumentException("Invalid user IDs for unfollow action"))
+        }
+        return try {
+            val updates = hashMapOf<String, Any?>(
+                "following/$currentUserId/$targetUserId" to null,
+                "followers/$targetUserId/$currentUserId" to null
+            )
+            database.reference.updateChildren(updates).await()
+
+            // Update user counters in database
+            updateFollowCounts(currentUserId)
+            updateFollowCounts(targetUserId)
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(tag, "Error unfollowing user: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    private suspend fun updateFollowCounts(userId: String) {
+        if (userId.isBlank()) return
+        try {
+            val followersSnap = database.getReference("followers").child(userId).get().await()
+            val followersCount = followersSnap.childrenCount.toInt()
+
+            val followingSnap = database.getReference("following").child(userId).get().await()
+            val followingCount = followingSnap.childrenCount.toInt()
+
+            val countUpdates = mapOf<String, Any>(
+                "followersCount" to followersCount,
+                "followingCount" to followingCount
+            )
+            database.getReference("users").child(userId).updateChildren(countUpdates).await()
+        } catch (e: Exception) {
+            Log.w(tag, "Error updating follow counts for $userId: ${e.message}")
+        }
+    }
+
+    // -------------------------------------------------------------
     // REAL-TIME INCOMING NOTIFICATIONS OBSERVER
     // -------------------------------------------------------------
 

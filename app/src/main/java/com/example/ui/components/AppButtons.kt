@@ -1,5 +1,7 @@
 package com.example.ui.components
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
@@ -27,6 +29,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -57,6 +60,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -76,11 +80,12 @@ fun AppPrimaryButton(
     icon: ImageVector? = null,
     isLoading: Boolean = false,
     enabled: Boolean = true,
-    height: Dp = 50.dp,
+    height: Dp = 48.dp,
     shape: Shape = AppButtonShape,
     containerColor: Color = AppTheme.colors.accentOrange,
     contentColor: Color = Color.White,
-    fontSize: TextUnit = 15.sp,
+    fontSize: TextUnit = 14.sp,
+    contentPadding: PaddingValues = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
     testTag: String? = null
 ) {
     val colors = AppTheme.colors
@@ -98,7 +103,7 @@ fun AppPrimaryButton(
         modifier = modifier
             .scale(animatedScale)
             .height(height)
-            .defaultMinSize(minHeight = 48.dp)
+            .defaultMinSize(minHeight = 44.dp)
             .then(if (testTag != null) Modifier.testTag(testTag) else Modifier),
         shape = shape,
         interactionSource = interactionSource,
@@ -108,7 +113,7 @@ fun AppPrimaryButton(
             disabledContainerColor = colors.surfaceVariant,
             disabledContentColor = colors.textDisabled
         ),
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
+        contentPadding = contentPadding,
         elevation = ButtonDefaults.buttonElevation(
             defaultElevation = 0.dp,
             pressedElevation = 2.dp,
@@ -117,35 +122,45 @@ fun AppPrimaryButton(
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
+            horizontalArrangement = Arrangement.Center,
+            modifier = Modifier.wrapContentWidth()
         ) {
             if (isLoading) {
                 CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(18.dp),
                     color = contentColor,
-                    strokeWidth = 2.5.dp
+                    strokeWidth = 2.dp
                 )
-                Spacer(modifier = Modifier.width(10.dp))
+                if (text.isNotEmpty()) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
             } else if (icon != null) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(20.dp),
                     tint = contentColor
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                if (text.isNotEmpty()) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                }
             }
 
-            Text(
-                text = text,
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontSize = fontSize,
-                    fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 0.2.sp
-                ),
-                color = if (enabled) contentColor else colors.textDisabled,
-                textAlign = TextAlign.Center
-            )
+            if (text.isNotEmpty()) {
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontSize = fontSize,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 0.1.sp
+                    ),
+                    color = if (enabled) contentColor else colors.textDisabled,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     }
 }
@@ -158,12 +173,13 @@ fun AppSecondaryButton(
     icon: ImageVector? = null,
     isLoading: Boolean = false,
     enabled: Boolean = true,
-    height: Dp = 46.dp,
+    height: Dp = 48.dp,
     shape: Shape = AppButtonShape,
     containerColor: Color = if (AppTheme.colors.isDark) Color(0xFF262626) else Color(0xFFEFEFEF),
     borderColor: Color = if (AppTheme.colors.isDark) Color(0xFF262626) else Color(0xFFDBDBDB),
     contentColor: Color = if (AppTheme.colors.isDark) Color(0xFFFFFFFF) else Color(0xFF111111),
     fontSize: TextUnit = 14.sp,
+    contentPadding: PaddingValues = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
     testTag: String? = null
 ) {
     val colors = AppTheme.colors
@@ -181,7 +197,7 @@ fun AppSecondaryButton(
         modifier = modifier
             .scale(animatedScale)
             .height(height)
-            .defaultMinSize(minHeight = 48.dp)
+            .defaultMinSize(minHeight = 44.dp)
             .then(if (testTag != null) Modifier.testTag(testTag) else Modifier),
         shape = shape,
         interactionSource = interactionSource,
@@ -192,11 +208,12 @@ fun AppSecondaryButton(
             disabledContainerColor = colors.surface.copy(alpha = 0.5f),
             disabledContentColor = colors.textDisabled
         ),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+        contentPadding = contentPadding
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
+            horizontalArrangement = Arrangement.Center,
+            modifier = Modifier.wrapContentWidth()
         ) {
             if (isLoading) {
                 CircularProgressIndicator(
@@ -204,26 +221,35 @@ fun AppSecondaryButton(
                     color = contentColor,
                     strokeWidth = 2.dp
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                if (text.isNotEmpty()) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
             } else if (icon != null) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(18.dp),
                     tint = if (enabled) contentColor else colors.textDisabled
                 )
-                Spacer(modifier = Modifier.width(6.dp))
+                if (text.isNotEmpty()) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                }
             }
 
-            Text(
-                text = text,
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    fontSize = fontSize,
-                    fontWeight = FontWeight.SemiBold
-                ),
-                color = if (enabled) contentColor else colors.textDisabled,
-                textAlign = TextAlign.Center
-            )
+            if (text.isNotEmpty()) {
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontSize = fontSize,
+                        fontWeight = FontWeight.SemiBold
+                    ),
+                    color = if (enabled) contentColor else colors.textDisabled,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     }
 }
@@ -246,15 +272,25 @@ fun AppDestructiveButton(
     val errorRedBorder = Color(0xFF8C1D24)
     val errorText = Color(0xFFFFB4AB)
 
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val animatedScale by animateFloatAsState(
+        targetValue = if (isPressed && enabled && !isLoading) 0.97f else 1f,
+        animationSpec = PremiumPressSpringSpec,
+        label = "destructiveBtnScale"
+    )
+
     if (isFilled) {
         Button(
             onClick = { if (!isLoading && enabled) onClick() },
             enabled = enabled && !isLoading,
             modifier = modifier
+                .scale(animatedScale)
                 .height(height)
                 .defaultMinSize(minHeight = 48.dp)
                 .then(if (testTag != null) Modifier.testTag(testTag) else Modifier),
             shape = shape,
+            interactionSource = interactionSource,
             colors = ButtonDefaults.buttonColors(
                 containerColor = errorRed,
                 contentColor = Color.White
@@ -279,10 +315,12 @@ fun AppDestructiveButton(
             onClick = { if (!isLoading && enabled) onClick() },
             enabled = enabled && !isLoading,
             modifier = modifier
+                .scale(animatedScale)
                 .height(height)
                 .defaultMinSize(minHeight = 48.dp)
                 .then(if (testTag != null) Modifier.testTag(testTag) else Modifier),
             shape = shape,
+            interactionSource = interactionSource,
             border = BorderStroke(1.dp, errorRedBorder),
             colors = ButtonDefaults.outlinedButtonColors(
                 containerColor = errorRedContainer.copy(alpha = 0.6f),
@@ -327,8 +365,8 @@ fun AppIconButton(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val animatedScale by animateFloatAsState(
-        targetValue = if (isPressed && enabled) 0.92f else 1f,
-        animationSpec = spring(dampingRatio = 0.75f, stiffness = 500f),
+        targetValue = if (isPressed && enabled) 0.94f else 1f,
+        animationSpec = PremiumPressSpringSpec,
         label = "iconBtnScale"
     )
 
@@ -376,8 +414,8 @@ fun AppSendButton(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        targetValue = if (isPressed && isSendEnabled) 0.92f else 1f,
-        animationSpec = spring(dampingRatio = 0.75f, stiffness = 500f),
+        targetValue = if (isPressed && isSendEnabled) 0.94f else 1f,
+        animationSpec = PremiumPressSpringSpec,
         label = "sendScale"
     )
 
@@ -422,8 +460,8 @@ fun AppAttachmentGridItem(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.94f else 1f,
-        animationSpec = spring(dampingRatio = 0.75f, stiffness = 400f),
+        targetValue = if (isPressed) 0.95f else 1f,
+        animationSpec = PremiumPressSpringSpec,
         label = "attachScale"
     )
 
@@ -475,6 +513,14 @@ fun AppFilterChip(
     showOnlineDot: Boolean = false
 ) {
     val colors = AppTheme.colors
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.96f else 1f,
+        animationSpec = PremiumPressSpringSpec,
+        label = "filterChipScale"
+    )
+
     val containerColor = if (selected) {
         if (colors.isDark) Color.White else Color(0xFF111111)
     } else {
@@ -493,10 +539,13 @@ fun AppFilterChip(
 
     Surface(
         onClick = onClick,
+        interactionSource = interactionSource,
         shape = RoundedCornerShape(12.dp),
         color = containerColor,
         border = BorderStroke(1.dp, borderColor),
-        modifier = modifier.height(34.dp)
+        modifier = modifier
+            .scale(scale)
+            .height(34.dp)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
@@ -542,9 +591,20 @@ fun AppGhostButton(
     contentColor: Color = AppTheme.colors.accentOrange,
     fontSize: TextUnit = 14.sp
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.96f else 1f,
+        animationSpec = PremiumPressSpringSpec,
+        label = "ghostBtnScale"
+    )
+
     TextButton(
         onClick = onClick,
-        modifier = modifier.defaultMinSize(minHeight = 44.dp),
+        interactionSource = interactionSource,
+        modifier = modifier
+            .scale(scale)
+            .defaultMinSize(minHeight = 44.dp),
         colors = ButtonDefaults.textButtonColors(contentColor = contentColor),
         shape = AppButtonSmallShape
     ) {
@@ -625,23 +685,40 @@ fun InstagramSwitch(
     enabled: Boolean = true,
     testTag: String? = null
 ) {
-    val trackColor = if (checked) Color(0xFFEFEFEF) else Color(0xFF363636)
-    val thumbColor = if (checked) Color(0xFF121212) else Color(0xFF8E8E8E)
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed && enabled) 0.94f else 1f,
+        animationSpec = PremiumPressSpringSpec,
+        label = "switchScale"
+    )
+
+    val trackColor by animateColorAsState(
+        targetValue = if (checked) Color(0xFFEFEFEF) else Color(0xFF363636),
+        animationSpec = tween(200, easing = FastOutSlowInEasing),
+        label = "switchTrackColor"
+    )
+    val thumbColor by animateColorAsState(
+        targetValue = if (checked) Color(0xFF121212) else Color(0xFF8E8E8E),
+        animationSpec = tween(200, easing = FastOutSlowInEasing),
+        label = "switchThumbColor"
+    )
     val thumbOffset by animateDpAsState(
         targetValue = if (checked) 20.dp else 2.dp,
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow),
         label = "instagram_thumb_offset"
     )
 
     Box(
         modifier = modifier
+            .scale(scale)
             .then(if (testTag != null) Modifier.testTag(testTag) else Modifier)
             .width(48.dp)
             .height(28.dp)
             .clip(RoundedCornerShape(14.dp))
             .background(trackColor)
             .clickable(
-                interactionSource = remember { MutableInteractionSource() },
+                interactionSource = interactionSource,
                 indication = null,
                 enabled = enabled
             ) { onCheckedChange(!checked) }

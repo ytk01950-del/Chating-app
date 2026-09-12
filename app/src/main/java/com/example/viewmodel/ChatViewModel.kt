@@ -93,6 +93,27 @@ class ChatViewModel(
     private val _activeStoryViewer = MutableStateFlow<Pair<User, List<Story>>?>(null)
     val activeStoryViewer: StateFlow<Pair<User, List<Story>>?> = _activeStoryViewer.asStateFlow()
 
+    private val _isSettingsOpen = MutableStateFlow(false)
+    val isSettingsOpen: StateFlow<Boolean> = _isSettingsOpen.asStateFlow()
+
+    // -------------------------------------------------------------
+    // FOLLOWERS, FOLLOWING & PRIVACY STATE
+    // -------------------------------------------------------------
+    private val _followedUserIds = MutableStateFlow<Set<String>>(emptySet())
+    val followedUserIds: StateFlow<Set<String>> = _followedUserIds.asStateFlow()
+
+    private val _viewingFollowersOfUser = MutableStateFlow<User?>(null)
+    val viewingFollowersOfUser: StateFlow<User?> = _viewingFollowersOfUser.asStateFlow()
+
+    private val _viewingFollowingOfUser = MutableStateFlow<User?>(null)
+    val viewingFollowingOfUser: StateFlow<User?> = _viewingFollowingOfUser.asStateFlow()
+
+    private val _followersList = MutableStateFlow<List<User>>(emptyList())
+    val followersList: StateFlow<List<User>> = _followersList.asStateFlow()
+
+    private val _followingList = MutableStateFlow<List<User>>(emptyList())
+    val followingList: StateFlow<List<User>> = _followingList.asStateFlow()
+
     // -------------------------------------------------------------
     // ONLINE USERS, FEED POSTS, REQUESTS & BLOCKS STATE
     // -------------------------------------------------------------
@@ -167,6 +188,10 @@ class ChatViewModel(
     private var activeCallJob: Job? = null
     private var callHistoryJob: Job? = null
     private var callTimerJob: Job? = null
+    private var followedUserIdsJob: Job? = null
+    private var followersJob: Job? = null
+    private var followingJob: Job? = null
+    private var profileUserJob: Job? = null
 
     // Grouped active stories for the Instagram/Snapchat style story tray
     val groupedStories: StateFlow<List<UserStoryGroup>> = combine(_activeStories, _allUsers, _currentUser) { stories, users, current ->
@@ -427,6 +452,12 @@ class ChatViewModel(
             _incomingCall.value = null
             _activeCallSession.value = null
             _callHistory.value = emptyList()
+            _followedUserIds.value = emptySet()
+            _followersList.value = emptyList()
+            _followingList.value = emptyList()
+            _viewingFollowersOfUser.value = null
+            _viewingFollowingOfUser.value = null
+            _isSettingsOpen.value = false
             _authUiState.value = AuthUiState.Idle
             usersJob?.cancel()
             onlineUsersJob?.cancel()
@@ -437,10 +468,14 @@ class ChatViewModel(
             messageRequestsJob?.cancel()
             blockedUsersJob?.cancel()
             profileStoriesJob?.cancel()
+            profileUserJob?.cancel()
             incomingCallJob?.cancel()
             activeCallJob?.cancel()
             callHistoryJob?.cancel()
             callTimerJob?.cancel()
+            followedUserIdsJob?.cancel()
+            followersJob?.cancel()
+            followingJob?.cancel()
         }
     }
 
@@ -509,6 +544,14 @@ class ChatViewModel(
         callHistoryJob = viewModelScope.launch {
             repository.observeCallHistory(currentUserId).collect { history ->
                 _callHistory.value = history
+            }
+        }
+
+        // Real-time live observed followed user IDs
+        followedUserIdsJob?.cancel()
+        followedUserIdsJob = viewModelScope.launch {
+            repository.observeFollowingUserIds(currentUserId).collect { ids ->
+                _followedUserIds.value = ids
             }
         }
 
@@ -701,6 +744,14 @@ class ChatViewModel(
                 _userStories.value = stories
             }
         }
+        profileUserJob?.cancel()
+        profileUserJob = viewModelScope.launch {
+            repository.observeUserProfile(user.id).collect { updatedProfile ->
+                if (updatedProfile != null) {
+                    _selectedProfileUser.value = updatedProfile
+                }
+            }
+        }
     }
 
     fun openCurrentProfile() {
@@ -708,8 +759,17 @@ class ChatViewModel(
         openUserProfile(current)
     }
 
+    fun openSettings() {
+        _isSettingsOpen.value = true
+    }
+
+    fun closeSettings() {
+        _isSettingsOpen.value = false
+    }
+
     fun closeUserProfile() {
         profileStoriesJob?.cancel()
+        profileUserJob?.cancel()
         _selectedProfileUser.value = null
         _userStories.value = emptyList()
     }
@@ -832,14 +892,24 @@ class ChatViewModel(
         }
     }
 
-    fun updateProfileDetails(displayName: String, bio: String, statusMessage: String, avatarId: Int, gender: String = "Male") {
+    fun updateProfileDetails(
+        displayName: String,
+        bio: String,
+        statusMessage: String,
+        avatarId: Int,
+        gender: String = "Male",
+        website: String = "",
+        dateOfBirth: String = ""
+    ) {
         val current = _currentUser.value ?: return
         val updated = current.copy(
             displayName = displayName.trim().ifBlank { current.displayName },
             bio = bio.trim(),
             statusMessage = statusMessage.trim().ifBlank { current.statusMessage },
             avatarId = avatarId,
-            gender = gender.ifBlank { current.gender }
+            gender = gender.ifBlank { current.gender },
+            website = website.trim().ifBlank { current.website },
+            dateOfBirth = dateOfBirth.trim().ifBlank { current.dateOfBirth }
         )
         _currentUser.value = updated
         if (_selectedProfileUser.value?.id == current.id) {
@@ -849,6 +919,155 @@ class ChatViewModel(
             repository.saveUserProfile(updated)
             _infoMessage.value = "Profile updated successfully"
         }
+    }
+
+    fun updatePrivacySettings(
+        whoCanFollow: String,
+        showFollowersCount: Boolean,
+        showFollowingCount: Boolean,
+        showFollowingList: Boolean,
+        showDateOfBirth: String
+    ) {
+        val current = _currentUser.value ?: return
+        val updated = current.copy(
+            whoCanFollow = whoCanFollow,
+            showFollowersCount = showFollowersCount,
+            showFollowingCount = showFollowingCount,
+            showFollowingList = showFollowingList,
+            showDateOfBirth = showDateOfBirth
+        )
+        _currentUser.value = updated
+        if (_selectedProfileUser.value?.id == current.id) {
+            _selectedProfileUser.value = updated
+        }
+        viewModelScope.launch {
+            repository.saveUserProfile(updated)
+            _infoMessage.value = "Privacy settings updated"
+        }
+    }
+
+    fun isFollowingUser(userId: String): Boolean {
+        return _followedUserIds.value.contains(userId)
+    }
+
+    fun followUser(targetUser: User) {
+        val current = _currentUser.value ?: return
+        if (targetUser.id == current.id || targetUser.id.isBlank()) return
+
+        // Immediate optimistic UI update
+        _followedUserIds.value = _followedUserIds.value + targetUser.id
+        if (_selectedProfileUser.value?.id == targetUser.id) {
+            _selectedProfileUser.value = _selectedProfileUser.value?.let {
+                it.copy(followersCount = it.followersCount + 1)
+            }
+        }
+        _currentUser.value = _currentUser.value?.let {
+            it.copy(followingCount = it.followingCount + 1)
+        }
+
+        viewModelScope.launch {
+            val result = repository.followUser(current.id, targetUser.id)
+            result.onSuccess {
+                _infoMessage.value = "Now following ${targetUser.displayName.ifBlank { targetUser.username }}"
+            }.onFailure { err ->
+                // Rollback optimistic update
+                _followedUserIds.value = _followedUserIds.value - targetUser.id
+                if (_selectedProfileUser.value?.id == targetUser.id) {
+                    _selectedProfileUser.value = _selectedProfileUser.value?.let {
+                        it.copy(followersCount = (it.followersCount - 1).coerceAtLeast(0))
+                    }
+                }
+                _currentUser.value = _currentUser.value?.let {
+                    it.copy(followingCount = (it.followingCount - 1).coerceAtLeast(0))
+                }
+                _errorMessage.value = "Failed to follow: ${err.localizedMessage ?: "Unknown error"}"
+            }
+        }
+    }
+
+    fun unfollowUser(targetUser: User) {
+        val current = _currentUser.value ?: return
+        if (targetUser.id == current.id || targetUser.id.isBlank()) return
+
+        // Immediate optimistic UI update
+        _followedUserIds.value = _followedUserIds.value - targetUser.id
+        if (_selectedProfileUser.value?.id == targetUser.id) {
+            _selectedProfileUser.value = _selectedProfileUser.value?.let {
+                it.copy(followersCount = (it.followersCount - 1).coerceAtLeast(0))
+            }
+        }
+        _currentUser.value = _currentUser.value?.let {
+            it.copy(followingCount = (it.followingCount - 1).coerceAtLeast(0))
+        }
+
+        viewModelScope.launch {
+            val result = repository.unfollowUser(current.id, targetUser.id)
+            result.onSuccess {
+                _infoMessage.value = "Unfollowed ${targetUser.displayName.ifBlank { targetUser.username }}"
+            }.onFailure { err ->
+                // Rollback optimistic update
+                _followedUserIds.value = _followedUserIds.value + targetUser.id
+                if (_selectedProfileUser.value?.id == targetUser.id) {
+                    _selectedProfileUser.value = _selectedProfileUser.value?.let {
+                        it.copy(followersCount = it.followersCount + 1)
+                    }
+                }
+                _currentUser.value = _currentUser.value?.let {
+                    it.copy(followingCount = it.followingCount + 1)
+                }
+                _errorMessage.value = "Failed to unfollow: ${err.localizedMessage ?: "Unknown error"}"
+            }
+        }
+    }
+
+    fun toggleFollowUser(targetUser: User) {
+        if (isFollowingUser(targetUser.id)) {
+            unfollowUser(targetUser)
+        } else {
+            followUser(targetUser)
+        }
+    }
+
+    fun openFollowersScreen(user: User) {
+        _viewingFollowersOfUser.value = user
+        _followersList.value = emptyList()
+        followersJob?.cancel()
+        followersJob = viewModelScope.launch {
+            repository.observeFollowers(user.id).collect { list ->
+                _followersList.value = list
+            }
+        }
+    }
+
+    fun openFollowingScreen(user: User) {
+        _viewingFollowingOfUser.value = user
+        _followingList.value = emptyList()
+        followingJob?.cancel()
+        followingJob = viewModelScope.launch {
+            repository.observeFollowing(user.id).collect { list ->
+                _followingList.value = list
+            }
+        }
+    }
+
+    fun closeFollowersScreen() {
+        followersJob?.cancel()
+        _viewingFollowersOfUser.value = null
+        _followersList.value = emptyList()
+    }
+
+    fun closeFollowingScreen() {
+        followingJob?.cancel()
+        _viewingFollowingOfUser.value = null
+        _followingList.value = emptyList()
+    }
+
+    fun getFollowersForUser(user: User): List<User> {
+        return _followersList.value
+    }
+
+    fun getFollowingForUser(user: User): List<User> {
+        return _followingList.value
     }
 
     // -------------------------------------------------------------

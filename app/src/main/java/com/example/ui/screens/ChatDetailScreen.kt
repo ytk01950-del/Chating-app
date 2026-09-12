@@ -5,15 +5,19 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.ui.graphics.graphicsLayer
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -133,6 +137,8 @@ import com.example.ui.components.AppSecondaryButton
 import com.example.ui.components.AppSendButton
 import com.example.ui.components.AppAttachmentGridItem
 import com.example.ui.components.InstagramSwitch
+import com.example.ui.components.clickableWithPress
+import com.example.ui.components.pressScale
 import com.example.ui.theme.AccentBlue
 import com.example.ui.theme.AccentBlueDark
 import com.example.ui.theme.DarkBg
@@ -267,9 +273,8 @@ fun ChatDetailScreen(
     }
 
     Scaffold(
-        modifier = Modifier
-            .fillMaxSize()
-            .imePadding(),
+        modifier = Modifier.fillMaxSize(),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         containerColor = DarkBg,
         topBar = {
             Surface(
@@ -392,6 +397,7 @@ fun ChatDetailScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .imePadding()
                 .background(DarkBg)
         ) {
             // Reaction Bar Overlay
@@ -424,7 +430,7 @@ fun ChatDetailScreen(
                                     fontSize = 22.sp,
                                     modifier = Modifier
                                         .clip(CircleShape)
-                                        .clickable {
+                                        .clickableWithPress {
                                             selectedMessageForReaction?.let { msg ->
                                                 onAddReaction(msg.id, emoji)
                                             }
@@ -544,7 +550,7 @@ fun ChatDetailScreen(
                                         shape = RoundedCornerShape(20.dp),
                                         color = DarkSurface,
                                         border = BorderStroke(1.dp, DarkBorder),
-                                        modifier = Modifier.clickable {
+                                        modifier = Modifier.clickableWithPress {
                                             if (chipText.contains("Photo")) {
                                                 pickPhotoLauncher.launch(
                                                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
@@ -634,7 +640,7 @@ fun ChatDetailScreen(
                                 fontSize = 22.sp,
                                 modifier = Modifier
                                     .clip(CircleShape)
-                                    .clickable {
+                                    .clickableWithPress {
                                         inputText += emoji
                                         onInputChange(inputText)
                                     }
@@ -1230,7 +1236,7 @@ fun AttachmentConfirmDialog(
                     )
 
                     AppPrimaryButton(
-                        text = "Send",
+                        text = "",
                         onClick = { onSend(caption, viewLimit, allowDownload) },
                         icon = Icons.AutoMirrored.Filled.Send,
                         modifier = Modifier.weight(1f),
@@ -1256,7 +1262,7 @@ fun FilterChipOption(
         shape = RoundedCornerShape(10.dp),
         color = if (isSelected) AccentBlue.copy(alpha = 0.2f) else DarkBg,
         border = BorderStroke(1.dp, if (isSelected) AccentBlue else DarkBorderSubtle),
-        modifier = modifier
+        modifier = modifier.pressScale()
     ) {
         Column(
             modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp),
@@ -1310,8 +1316,46 @@ fun SophisticatedMessageBubble(
     val isDisappearing = message.isDisappearing()
     val isExpired = message.isMediaExpired()
 
+    val offsetY = remember { Animatable(28f) }
+    val alpha = remember { Animatable(0.2f) }
+    val scale = remember { Animatable(0.95f) }
+
+    LaunchedEffect(message.id) {
+        launch {
+            offsetY.animateTo(
+                targetValue = 0f,
+                animationSpec = spring(
+                    dampingRatio = 0.82f,
+                    stiffness = 380f
+                )
+            )
+        }
+        launch {
+            alpha.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = 180)
+            )
+        }
+        launch {
+            scale.animateTo(
+                targetValue = 1f,
+                animationSpec = spring(
+                    dampingRatio = 0.82f,
+                    stiffness = 380f
+                )
+            )
+        }
+    }
+
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                translationY = offsetY.value
+                this.alpha = alpha.value
+                scaleX = scale.value
+                scaleY = scale.value
+            },
         horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start
     ) {
         Column(
@@ -1333,7 +1377,7 @@ fun SophisticatedMessageBubble(
                         },
                         shape = bubbleShape
                     )
-                    .clickable {
+                    .clickableWithPress {
                         if (isDisappearing && !isExpired) {
                             onDisappearingMediaClick(message)
                         } else {

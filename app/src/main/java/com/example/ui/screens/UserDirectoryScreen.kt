@@ -75,6 +75,8 @@ import com.example.ui.components.NavigationTab
 import com.example.ui.components.StoryAvatarRing
 import com.example.ui.components.StoryTray
 import com.example.ui.components.UserAvatar
+import com.example.ui.components.clickableWithPress
+import com.example.ui.components.pressScale
 import com.example.ui.theme.AppTheme
 import com.example.ui.theme.AppThemeMode
 import com.example.ui.theme.LocalThemeUpdater
@@ -109,8 +111,15 @@ fun UserDirectoryScreen(
     onOpenProfile: () -> Unit = {},
     onUploadProfilePhoto: (Uri) -> Unit = {},
     onUpdateProfile: (String, String, String, Int, String) -> Unit = { _, _, _, _, _ -> },
+    onUpdateProfileExtended: (String, String, String, Int, String, String, String) -> Unit = { _, _, _, _, _, _, _ -> },
     onClaimUsername: (String, (Boolean) -> Unit) -> Unit = { _, _ -> },
     onCheckUsernameAvailable: suspend (String) -> Boolean = { true },
+    onOpenSettings: () -> Unit = {},
+    onOpenFollowers: (User) -> Unit = {},
+    onOpenFollowing: (User) -> Unit = {},
+    onFollowClick: (User) -> Unit = {},
+    onUnfollowClick: (User) -> Unit = {},
+    onUpdatePrivacy: (String, Boolean, Boolean, Boolean, String) -> Unit = { _, _, _, _, _ -> },
     isUploadingProfilePhoto: Boolean = false,
     currentThemeMode: AppThemeMode = AppTheme.mode,
     onThemeModeChange: (AppThemeMode) -> Unit = LocalThemeUpdater.current,
@@ -137,69 +146,71 @@ fun UserDirectoryScreen(
             .imePadding(),
         containerColor = colors.background,
         topBar = {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = if (colors.isDark) Color(0xFF000000) else colors.surface,
-                border = BorderStroke(1.dp, if (colors.isDark) Color(0xFF262626) else colors.border)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+            if (selectedTab != NavigationTab.PROFILE) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = if (colors.isDark) Color(0xFF000000) else colors.surface,
+                    border = BorderStroke(1.dp, if (colors.isDark) Color(0xFF262626) else colors.border)
                 ) {
-                    Text(
-                        text = when (selectedTab) {
-                            NavigationTab.CHATS -> "Chats"
-                            NavigationTab.CALLS -> "Calls"
-                            NavigationTab.STORIES -> "Stories"
-                            NavigationTab.SETTINGS -> "Settings"
-                        },
-                        style = MaterialTheme.typography.headlineMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 26.sp,
-                            letterSpacing = (-0.5).sp
-                        ),
-                        color = colors.textPrimary,
-                        modifier = Modifier.testTag("dynamic_tab_title")
-                    )
-
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        IconButton(
-                            onClick = onOpenAddStory,
-                            modifier = Modifier
-                                .size(42.dp)
-                                .testTag("top_bar_camera_action")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.CameraAlt,
-                                contentDescription = "Camera",
-                                tint = colors.textPrimary,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-
-                        IconButton(
-                            onClick = {
-                                if (selectedTab != NavigationTab.CHATS) {
-                                    selectedTab = NavigationTab.CHATS
-                                }
-                                isSearchUsersMode = !isSearchUsersMode
+                        Text(
+                            text = when (selectedTab) {
+                                NavigationTab.CHATS -> "Chats"
+                                NavigationTab.CALLS -> "Calls"
+                                NavigationTab.STORIES -> "Stories"
+                                NavigationTab.PROFILE -> "Profile"
                             },
-                            modifier = Modifier
-                                .size(42.dp)
-                                .testTag("top_bar_search_action")
+                            style = MaterialTheme.typography.headlineMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 26.sp,
+                                letterSpacing = (-0.5).sp
+                            ),
+                            color = colors.textPrimary,
+                            modifier = Modifier.testTag("dynamic_tab_title")
+                        )
+
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Search,
-                                contentDescription = "Search",
-                                tint = if (isSearchUsersMode) colors.accentOrange else colors.textPrimary,
-                                modifier = Modifier.size(22.dp)
-                            )
+                            IconButton(
+                                onClick = onOpenAddStory,
+                                modifier = Modifier
+                                    .size(42.dp)
+                                    .testTag("top_bar_camera_action")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CameraAlt,
+                                    contentDescription = "Camera",
+                                    tint = colors.textPrimary,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+
+                            IconButton(
+                                onClick = {
+                                    if (selectedTab != NavigationTab.CHATS) {
+                                        selectedTab = NavigationTab.CHATS
+                                    }
+                                    isSearchUsersMode = !isSearchUsersMode
+                                },
+                                modifier = Modifier
+                                    .size(42.dp)
+                                    .testTag("top_bar_search_action")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = "Search",
+                                    tint = if (isSearchUsersMode) colors.accentOrange else colors.textPrimary,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -255,7 +266,7 @@ fun UserDirectoryScreen(
                             onOpenAddStory = onOpenAddStory,
                             onViewUserStories = onViewUserStories,
                             onSelectUser = onSelectUser,
-                            onOpenProfile = { selectedTab = NavigationTab.SETTINGS },
+                            onOpenProfile = { selectedTab = NavigationTab.PROFILE },
                             needsUsername = needsUsername
                         )
                     }
@@ -280,17 +291,21 @@ fun UserDirectoryScreen(
                         )
                     }
 
-                    NavigationTab.SETTINGS -> {
-                        SettingsTab(
+                    NavigationTab.PROFILE -> {
+                        ProfileDetailsScreen(
                             currentUser = currentUser,
-                            onUploadProfilePhoto = onUploadProfilePhoto,
-                            onUpdateProfile = onUpdateProfile,
-                            onClaimUsername = onClaimUsername,
-                            onCheckUsernameAvailable = onCheckUsernameAvailable,
-                            isUploadingPhoto = isUploadingProfilePhoto,
-                            currentThemeMode = currentThemeMode,
-                            onThemeModeChange = onThemeModeChange,
-                            onSignOut = onSignOut
+                            profileUser = currentUser,
+                            isFollowing = false,
+                            onBack = null,
+                            onOpenChat = {},
+                            onFollowClick = { targetUser -> onFollowClick(targetUser) },
+                            onUnfollowClick = { targetUser -> onUnfollowClick(targetUser) },
+                            onOpenFollowers = { targetUser -> onOpenFollowers(targetUser) },
+                            onOpenFollowing = { targetUser -> onOpenFollowing(targetUser) },
+                            onUpdatePrivacy = onUpdatePrivacy,
+                            onUpdateProfile = onUpdateProfileExtended,
+                            onOpenSettings = onOpenSettings,
+                            modifier = Modifier.padding(bottom = 76.dp)
                         )
                     }
                 }
@@ -340,7 +355,7 @@ private fun ChatsTabView(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 6.dp)
-                    .clickable { onOpenProfile() }
+                    .clickableWithPress { onOpenProfile() }
                     .testTag("claim_username_banner")
             ) {
                 Row(
@@ -491,6 +506,48 @@ private fun ChatsTabView(
                         enabled = searchUserQuery.trim().length >= 2 && !isSearchingUser,
                         height = 48.dp,
                         testTag = "chat_id_search_button"
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Filter Chips Row
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                item {
+                    AppFilterChip(
+                        selected = !isSearchUsersMode && !filterOnlineOnly,
+                        onClick = {
+                            onToggleSearchUsersMode(false)
+                            if (filterOnlineOnly) onToggleOnlineFilter()
+                        },
+                        label = "All Chats",
+                        badgeCount = users.size
+                    )
+                }
+                item {
+                    AppFilterChip(
+                        selected = !isSearchUsersMode && filterOnlineOnly,
+                        onClick = {
+                            onToggleSearchUsersMode(false)
+                            if (!filterOnlineOnly) onToggleOnlineFilter()
+                        },
+                        label = "Online",
+                        badgeCount = onlineCount,
+                        showOnlineDot = true
+                    )
+                }
+                item {
+                    AppFilterChip(
+                        selected = isSearchUsersMode,
+                        onClick = {
+                            onToggleSearchUsersMode(!isSearchUsersMode)
+                        },
+                        label = "Find @ChatID",
+                        badgeCount = if (searchResults.isNotEmpty()) searchResults.size else 0
                     )
                 }
             }
@@ -760,7 +817,7 @@ fun UserItemCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
+            .clickableWithPress { onClick() }
             .testTag("user_item_${user.id}"),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = colors.cardBackground),

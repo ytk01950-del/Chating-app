@@ -15,8 +15,11 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -42,7 +45,11 @@ import com.example.ui.screens.ActiveCallScreen
 import com.example.ui.screens.AuthScreen
 import com.example.ui.screens.ChatDetailScreen
 import com.example.ui.screens.CreateStoryDialog
+import com.example.ui.screens.FollowersScreen
+import com.example.ui.screens.FollowingScreen
 import com.example.ui.screens.IncomingCallDialog
+import com.example.ui.screens.ProfileDetailsScreen
+import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.SocialProfileScreen
 import com.example.ui.screens.StoryViewerDialog
 import com.example.ui.screens.UserDirectoryScreen
@@ -158,6 +165,14 @@ fun WpChatApp(
     val isVideoCameraOff by viewModel.isVideoCameraOff.collectAsStateWithLifecycle()
     val isFrontCamera by viewModel.isFrontCamera.collectAsStateWithLifecycle()
     val callDurationSeconds by viewModel.callDurationSeconds.collectAsStateWithLifecycle()
+
+    // Followers, Following & Privacy State
+    val followedUserIds by viewModel.followedUserIds.collectAsStateWithLifecycle()
+    val viewingFollowersOfUser by viewModel.viewingFollowersOfUser.collectAsStateWithLifecycle()
+    val viewingFollowingOfUser by viewModel.viewingFollowingOfUser.collectAsStateWithLifecycle()
+    val followersList by viewModel.followersList.collectAsStateWithLifecycle()
+    val followingList by viewModel.followingList.collectAsStateWithLifecycle()
+    val isSettingsOpen by viewModel.isSettingsOpen.collectAsStateWithLifecycle()
 
     var pendingCallTarget by remember { mutableStateOf<User?>(null) }
     var pendingCallIsVideo by remember { mutableStateOf(false) }
@@ -280,11 +295,22 @@ fun WpChatApp(
             AnimatedContent(
                 targetState = when {
                     currentUser == null -> ScreenState.Auth
-                    selectedProfileUser != null -> ScreenState.SocialProfile
+                    isSettingsOpen -> ScreenState.Settings
+                    viewingFollowersOfUser != null -> ScreenState.Followers
+                    viewingFollowingOfUser != null -> ScreenState.Following
+                    selectedProfileUser != null -> ScreenState.ProfileDetails
                     activeContact != null -> ScreenState.ChatDetail
                     else -> ScreenState.Directory
                 },
-                transitionSpec = { fadeIn() togetherWith fadeOut() },
+                transitionSpec = {
+                    (fadeIn(animationSpec = tween(220)) + slideInHorizontally(
+                        animationSpec = tween(220),
+                        initialOffsetX = { fullWidth -> fullWidth / 8 }
+                    )) togetherWith (fadeOut(animationSpec = tween(180)) + slideOutHorizontally(
+                        animationSpec = tween(180),
+                        targetOffsetX = { fullWidth -> -fullWidth / 8 }
+                    ))
+                },
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues),
@@ -359,16 +385,162 @@ fun WpChatApp(
                                 onUpdateProfile = { name, bio, status, avatarId, gender ->
                                     viewModel.updateProfileDetails(name, bio, status, avatarId, gender)
                                 },
+                                onUpdateProfileExtended = { name, bio, status, avatarId, gender, website, dob ->
+                                    viewModel.updateProfileDetails(name, bio, status, avatarId, gender, website, dob)
+                                },
                                 onClaimUsername = { username, callback ->
                                     viewModel.claimUsernameForCurrentUser(username, callback)
                                 },
                                 onCheckUsernameAvailable = { username ->
                                     viewModel.checkUsernameAvailability(username)
                                 },
+                                onOpenSettings = { viewModel.openSettings() },
+                                onOpenFollowers = { targetUser ->
+                                    viewModel.openFollowersScreen(targetUser)
+                                },
+                                onOpenFollowing = { targetUser ->
+                                    viewModel.openFollowingScreen(targetUser)
+                                },
+                                onFollowClick = { targetUser ->
+                                    viewModel.followUser(targetUser)
+                                },
+                                onUnfollowClick = { targetUser ->
+                                    viewModel.unfollowUser(targetUser)
+                                },
+                                onUpdatePrivacy = { whoCanFollow, showFollowers, showFollowing, showList, showDob ->
+                                    viewModel.updatePrivacySettings(whoCanFollow, showFollowers, showFollowing, showList, showDob)
+                                },
                                 isUploadingProfilePhoto = isUploadingProfilePhoto,
                                 currentThemeMode = currentThemeMode,
                                 onThemeModeChange = onThemeModeChange,
                                 onSignOut = { viewModel.signOut() }
+                            )
+                        }
+                    }
+
+                    ScreenState.Settings -> {
+                        val user = currentUser
+                        if (user != null) {
+                            BackHandler {
+                                viewModel.closeSettings()
+                            }
+                            SettingsScreen(
+                                currentUser = user,
+                                onBack = { viewModel.closeSettings() },
+                                onUploadProfilePhoto = { uri ->
+                                    viewModel.uploadProfilePhoto(uri, context)
+                                },
+                                onUpdateProfile = { name, bio, status, avatarId, gender ->
+                                    viewModel.updateProfileDetails(name, bio, status, avatarId, gender)
+                                },
+                                onClaimUsername = { username, callback ->
+                                    viewModel.claimUsernameForCurrentUser(username, callback)
+                                },
+                                onCheckUsernameAvailable = { username ->
+                                    viewModel.checkUsernameAvailability(username)
+                                },
+                                isUploadingPhoto = isUploadingProfilePhoto,
+                                currentThemeMode = currentThemeMode,
+                                onThemeModeChange = onThemeModeChange,
+                                onSignOut = {
+                                    viewModel.closeSettings()
+                                    viewModel.signOut()
+                                }
+                            )
+                        }
+                    }
+
+                    ScreenState.ProfileDetails -> {
+                        val user = currentUser
+                        val profileUser = selectedProfileUser
+                        if (user != null && profileUser != null) {
+                            BackHandler {
+                                viewModel.closeUserProfile()
+                            }
+                            ProfileDetailsScreen(
+                                currentUser = user,
+                                profileUser = profileUser,
+                                isFollowing = followedUserIds.contains(profileUser.id),
+                                onBack = { viewModel.closeUserProfile() },
+                                onOpenChat = { targetUser ->
+                                    viewModel.closeUserProfile()
+                                    viewModel.openChatWith(targetUser)
+                                },
+                                onFollowClick = { targetUser ->
+                                    viewModel.followUser(targetUser)
+                                },
+                                onUnfollowClick = { targetUser ->
+                                    viewModel.unfollowUser(targetUser)
+                                },
+                                onOpenFollowers = { targetUser ->
+                                    viewModel.openFollowersScreen(targetUser)
+                                },
+                                onOpenFollowing = { targetUser ->
+                                    viewModel.openFollowingScreen(targetUser)
+                                },
+                                onUpdatePrivacy = { whoCanFollow, showFollowers, showFollowing, showList, showDob ->
+                                    viewModel.updatePrivacySettings(whoCanFollow, showFollowers, showFollowing, showList, showDob)
+                                },
+                                onUpdateProfile = { name, bio, status, avatarId, gender, website, dob ->
+                                    viewModel.updateProfileDetails(name, bio, status, avatarId, gender, website, dob)
+                                },
+                                onOpenSettings = {
+                                    viewModel.openSettings()
+                                }
+                            )
+                        }
+                    }
+
+                    ScreenState.Followers -> {
+                        val user = currentUser
+                        val profileUser = viewingFollowersOfUser
+                        if (user != null && profileUser != null) {
+                            BackHandler {
+                                viewModel.closeFollowersScreen()
+                            }
+                            FollowersScreen(
+                                currentUser = user,
+                                profileUser = profileUser,
+                                followersList = followersList,
+                                followedUserIds = followedUserIds,
+                                onBack = { viewModel.closeFollowersScreen() },
+                                onUserClick = { clickedUser ->
+                                    viewModel.closeFollowersScreen()
+                                    viewModel.openUserProfile(clickedUser)
+                                },
+                                onFollowClick = { targetUser ->
+                                    viewModel.followUser(targetUser)
+                                },
+                                onUnfollowClick = { targetUser ->
+                                    viewModel.unfollowUser(targetUser)
+                                }
+                            )
+                        }
+                    }
+
+                    ScreenState.Following -> {
+                        val user = currentUser
+                        val profileUser = viewingFollowingOfUser
+                        if (user != null && profileUser != null) {
+                            BackHandler {
+                                viewModel.closeFollowingScreen()
+                            }
+                            FollowingScreen(
+                                currentUser = user,
+                                profileUser = profileUser,
+                                followingList = followingList,
+                                followedUserIds = followedUserIds,
+                                onBack = { viewModel.closeFollowingScreen() },
+                                onUserClick = { clickedUser ->
+                                    viewModel.closeFollowingScreen()
+                                    viewModel.openUserProfile(clickedUser)
+                                },
+                                onFollowClick = { targetUser ->
+                                    viewModel.followUser(targetUser)
+                                },
+                                onUnfollowClick = { targetUser ->
+                                    viewModel.unfollowUser(targetUser)
+                                }
                             )
                         }
                     }
@@ -560,6 +732,10 @@ fun WpChatApp(
 enum class ScreenState {
     Auth,
     Directory,
+    ProfileDetails,
+    Followers,
+    Following,
     SocialProfile,
-    ChatDetail
+    ChatDetail,
+    Settings
 }

@@ -28,6 +28,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AlternateEmail
 import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.CameraAlt
@@ -53,6 +54,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -1220,3 +1222,79 @@ private fun SettingsSwitchRow(
         )
     }
 }
+
+@Composable
+fun SettingsScreen(
+    currentUser: User,
+    onBack: () -> Unit,
+    onUploadProfilePhoto: (Uri) -> Unit = {},
+    onUpdateProfile: (String, String, String, Int, String) -> Unit = { _, _, _, _, _ -> },
+    onClaimUsername: (String, (Boolean) -> Unit) -> Unit = { _, _ -> },
+    onCheckUsernameAvailable: suspend (String) -> Boolean = { true },
+    isUploadingPhoto: Boolean = false,
+    currentThemeMode: AppThemeMode = AppTheme.mode,
+    onThemeModeChange: (AppThemeMode) -> Unit = LocalThemeUpdater.current,
+    onSignOut: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val colors = AppTheme.colors
+
+    Scaffold(
+        topBar = {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(colors.background)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    onClick = onBack,
+                    modifier = Modifier
+                        .size(42.dp)
+                        .testTag("settings_back_button"),
+                    shape = RoundedCornerShape(12.dp),
+                    color = colors.cardBackground,
+                    border = BorderStroke(1.dp, colors.border)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = colors.textPrimary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+
+                Text(
+                    text = "Settings",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 17.sp
+                    ),
+                    color = colors.textPrimary
+                )
+
+                Spacer(modifier = Modifier.size(42.dp))
+            }
+        },
+        containerColor = colors.background,
+        modifier = modifier.fillMaxSize()
+    ) { innerPadding ->
+        SettingsTab(
+            currentUser = currentUser,
+            onUploadProfilePhoto = onUploadProfilePhoto,
+            onUpdateProfile = onUpdateProfile,
+            onClaimUsername = onClaimUsername,
+            onCheckUsernameAvailable = onCheckUsernameAvailable,
+            isUploadingPhoto = isUploadingPhoto,
+            currentThemeMode = currentThemeMode,
+            onThemeModeChange = onThemeModeChange,
+            onSignOut = onSignOut,
+            modifier = Modifier.padding(innerPadding)
+        )
+    }
+}
+
