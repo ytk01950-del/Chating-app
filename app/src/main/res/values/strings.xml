@@ -14,4 +14,11 @@
     <string name="incoming_video_call">Incoming Video Call</string>
     <string name="missed_audio_call">Missed Audio Call</string>
     <string name="missed_video_call">Missed Video Call</string>
+    <string name="permission_dialog_title">Enable Call &amp; Message Alerts</string>
+    <string name="permission_dialog_desc">To ring incoming audio &amp; video calls and deliver instant messages when the app is closed or your screen is locked, Nexa needs permissions to notify and display calls.</string>
+    <string name="permission_post_notifications">Notifications</string>
+    <string name="permission_display_over_apps">Display over other apps (Draw overlay)</string>
+    <string name="permission_full_screen_intent">Full-screen call alerts</string>
+    <string name="permission_enable_all">Enable Permissions</string>
+    <string name="permission_continue">Continue</string>
 </resources>

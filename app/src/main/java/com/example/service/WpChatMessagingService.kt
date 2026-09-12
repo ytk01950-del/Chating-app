@@ -1,9 +1,11 @@
 package com.example.service
 
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
 import android.os.PowerManager
 import android.util.Log
+import androidx.core.content.ContextCompat
 import com.example.util.WpChatNotificationHelper
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
@@ -152,18 +154,20 @@ class WpChatMessagingService : FirebaseMessagingService() {
                     Log.w(tag, "Call status update note: ${e.message}")
                 }
 
-                // Launch high-priority Foreground Service with FullScreenIntent
+                // Launch high-priority Foreground Service with FullScreenIntent immediately using ContextCompat.startForegroundService()
                 try {
-                    IncomingCallRingingService.startRinging(
-                        context = applicationContext,
-                        callId = callId,
-                        callerId = callerId,
-                        callerName = callerName,
-                        callerUsername = callerUsername,
-                        callerPhotoUrl = callerPhotoUrl,
-                        callerAvatarId = callerAvatarId,
-                        callType = callType
-                    )
+                    val serviceIntent = Intent(applicationContext, IncomingCallRingingService::class.java).apply {
+                        action = IncomingCallRingingService.ACTION_START_RINGING
+                        putExtra(WpChatNotificationHelper.EXTRA_CALL_ID, callId)
+                        putExtra(WpChatNotificationHelper.EXTRA_CALLER_ID, callerId)
+                        putExtra(WpChatNotificationHelper.EXTRA_CALLER_NAME, callerName)
+                        putExtra(WpChatNotificationHelper.EXTRA_CALLER_USERNAME, callerUsername)
+                        putExtra(WpChatNotificationHelper.EXTRA_CALLER_PHOTO, callerPhotoUrl)
+                        putExtra(WpChatNotificationHelper.EXTRA_CALLER_AVATAR, callerAvatarId)
+                        putExtra(WpChatNotificationHelper.EXTRA_CALL_TYPE, callType)
+                    }
+                    ContextCompat.startForegroundService(applicationContext, serviceIntent)
+                    Log.i(tag, "Foreground service started via ContextCompat.startForegroundService for call: $callId")
                 } catch (e: Exception) {
                     Log.w(tag, "Foreground ringing service start note: ${e.message}")
                 }

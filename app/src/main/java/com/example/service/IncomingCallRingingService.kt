@@ -84,11 +84,7 @@ open class IncomingCallRingingService : Service() {
                 putExtra(WpChatNotificationHelper.EXTRA_CALL_TYPE, callType)
             }
             try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    context.startForegroundService(intent)
-                } else {
-                    context.startService(intent)
-                }
+                ContextCompat.startForegroundService(context, intent)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to start IncomingCallRingingService: ${e.message}", e)
             }

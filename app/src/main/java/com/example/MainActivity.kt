@@ -1,11 +1,14 @@
 package com.example
 
 import android.Manifest
+import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -33,6 +36,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,6 +51,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.model.User
+import com.example.ui.components.CallAndNotificationPermissionsDialog
 import com.example.ui.components.NexaSplashScreen
 import com.example.ui.screens.ActiveCallScreen
 import com.example.ui.screens.AuthScreen
@@ -261,24 +266,164 @@ fun WpChatApp(
 
     val snackbarHostState = remember { SnackbarHostState() }
 
+    // Permission tracking helpers
+    val checkNotificationsGranted: () -> Boolean = remember(context) {
+        {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED
+            } else {
+                true
+            }
+        }
+    }
+
+    val checkOverlayGranted: () -> Boolean = remember(context) {
+        {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                Settings.canDrawOverlays(context)
+            } else {
+                true
+            }
+        }
+    }
+
+    val checkFullScreenIntentGranted: () -> Boolean = remember(context) {
+        {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+                nm?.canUseFullScreenIntent() ?: true
+            } else {
+                true
+            }
+        }
+    }
+
+    var isNotificationsGranted by remember { mutableStateOf(checkNotificationsGranted()) }
+    var isOverlayGranted by remember { mutableStateOf(checkOverlayGranted()) }
+    var isFullScreenIntentGranted by remember { mutableStateOf(checkFullScreenIntentGranted()) }
+
+    val permPrefs = remember { context.getSharedPreferences("nexa_permission_prefs", Context.MODE_PRIVATE) }
+    var showPermissionsDialog by remember {
+        mutableStateOf(
+            !permPrefs.getBoolean("has_completed_permission_prompt", false) &&
+            (!isNotificationsGranted || !isOverlayGranted || !isFullScreenIntentGranted)
+        )
+    }
+
+    val lifecycleOwner = LocalContext.current as? androidx.lifecycle.LifecycleOwner
+    if (lifecycleOwner != null) {
+        DisposableEffect(lifecycleOwner) {
+            val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                    isNotificationsGranted = checkNotificationsGranted()
+                    isOverlayGranted = checkOverlayGranted()
+                    isFullScreenIntentGranted = checkFullScreenIntentGranted()
+                    if (isNotificationsGranted && isOverlayGranted && isFullScreenIntentGranted) {
+                        showPermissionsDialog = false
+                        permPrefs.edit().putBoolean("has_completed_permission_prompt", true).apply()
+                    }
+                }
+            }
+            lifecycleOwner.lifecycle.addObserver(observer)
+            onDispose {
+                lifecycleOwner.lifecycle.removeObserver(observer)
+            }
+        }
+    }
+
+    val overlayPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) {
+        isOverlayGranted = checkOverlayGranted()
+        if (isNotificationsGranted && isOverlayGranted && isFullScreenIntentGranted) {
+            showPermissionsDialog = false
+            permPrefs.edit().putBoolean("has_completed_permission_prompt", true).apply()
+        }
+    }
+
+    val fullScreenIntentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) {
+        isFullScreenIntentGranted = checkFullScreenIntentGranted()
+        if (isNotificationsGranted && isOverlayGranted && isFullScreenIntentGranted) {
+            showPermissionsDialog = false
+            permPrefs.edit().putBoolean("has_completed_permission_prompt", true).apply()
+        }
+    }
+
     // Request Notification permission on Android 13+ (API 33+)
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
-    ) { _ -> }
+    ) { granted ->
+        isNotificationsGranted = granted
+        if (isNotificationsGranted && isOverlayGranted && isFullScreenIntentGranted) {
+            showPermissionsDialog = false
+            permPrefs.edit().putBoolean("has_completed_permission_prompt", true).apply()
+        }
+    }
+
+    val requestOverlay: () -> Unit = {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) {
+            try {
+                val intent = Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:${context.packageName}")
+                )
+                overlayPermissionLauncher.launch(intent)
+            } catch (e: Exception) {
+                val fallback = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
+                overlayPermissionLauncher.launch(fallback)
+            }
+        }
+    }
+
+    val requestFullScreenIntent: () -> Unit = {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            if (nm?.canUseFullScreenIntent() == false) {
+                try {
+                    val intent = Intent(
+                        Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
+                        Uri.parse("package:${context.packageName}")
+                    )
+                    fullScreenIntentLauncher.launch(intent)
+                } catch (e: Exception) {
+                    val fallback = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                        putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                    }
+                    fullScreenIntentLauncher.launch(fallback)
+                }
+            }
+        }
+    }
+
+    val requestAllPermissions: () -> Unit = {
+        if (!isNotificationsGranted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else if (!isOverlayGranted) {
+            requestOverlay()
+        } else if (!isFullScreenIntentGranted) {
+            requestFullScreenIntent()
+        } else {
+            showPermissionsDialog = false
+            permPrefs.edit().putBoolean("has_completed_permission_prompt", true).apply()
+        }
+    }
+
+    // Automatically request permissions on app launch
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !checkNotificationsGranted()) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
 
     LaunchedEffect(currentUser) {
         currentUser?.id?.let { uid ->
             if (uid.isNotBlank()) {
                 com.example.service.WpChatMessagingService.saveCurrentUserId(context, uid)
-            }
-        }
-        if (currentUser != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val hasPermission = ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.POST_NOTIFICATIONS
-            ) == PackageManager.PERMISSION_GRANTED
-            if (!hasPermission) {
-                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
     }
@@ -764,6 +909,27 @@ fun WpChatApp(
                         viewModel.createStory(mediaUri, isVideo, caption, context)
                         showTrayCreateStoryDialog = false
                         pendingTrayMediaUri = null
+                    }
+                )
+            }
+
+            // Call and Notification Auto-Permission Prompt Dialog
+            if (showPermissionsDialog) {
+                CallAndNotificationPermissionsDialog(
+                    isNotificationsGranted = isNotificationsGranted,
+                    isOverlayGranted = isOverlayGranted,
+                    isFullScreenIntentGranted = isFullScreenIntentGranted,
+                    onRequestNotifications = {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                    },
+                    onRequestOverlay = requestOverlay,
+                    onRequestFullScreenIntent = requestFullScreenIntent,
+                    onRequestAll = requestAllPermissions,
+                    onDismiss = {
+                        showPermissionsDialog = false
+                        permPrefs.edit().putBoolean("has_completed_permission_prompt", true).apply()
                     }
                 )
             }
