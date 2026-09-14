@@ -81,9 +81,6 @@ import com.example.ui.theme.AppTheme
 import com.example.ui.theme.AppThemeMode
 import com.example.ui.theme.LocalThemeUpdater
 import com.example.ui.theme.OnlineGreen
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

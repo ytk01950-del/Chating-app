@@ -61,6 +61,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -119,18 +120,6 @@ fun ActiveCallScreen(
         else -> "Connecting..."
     }
 
-    // Sound wave pulse animation
-    val infiniteTransition = rememberInfiniteTransition(label = "audioWave")
-    val waveScale by infiniteTransition.animateFloat(
-        initialValue = 1.0f,
-        targetValue = 1.15f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(800, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "waveScale"
-    )
-
     Dialog(
         onDismissRequest = { /* Must use end call button */ },
         properties = DialogProperties(
@@ -172,12 +161,9 @@ fun ActiveCallScreen(
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     if (isConnected) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(160.dp)
-                                                .scale(waveScale)
-                                                .clip(CircleShape)
-                                                .background(Color(0xFF0284C7).copy(alpha = 0.2f))
+                                        PulsingWaveRing(
+                                            size = 160.dp,
+                                            color = Color(0xFF0284C7).copy(alpha = 0.2f)
                                         )
                                     }
                                     UserAvatar(
@@ -255,12 +241,9 @@ fun ActiveCallScreen(
                             modifier = Modifier.size(220.dp)
                         ) {
                             if (isConnected) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(200.dp)
-                                        .scale(waveScale)
-                                        .clip(CircleShape)
-                                        .background(OnlineGreen.copy(alpha = 0.15f))
+                                PulsingWaveRing(
+                                    size = 200.dp,
+                                    color = OnlineGreen.copy(alpha = 0.15f)
                                 )
                             }
                             Box(
@@ -560,5 +543,34 @@ fun CameraPreviewView(
             }, ContextCompat.getMainExecutor(context))
         },
         modifier = modifier
+    )
+}
+
+@Composable
+private fun PulsingWaveRing(
+    size: androidx.compose.ui.unit.Dp,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "audioWave")
+    val waveScale by infiniteTransition.animateFloat(
+        initialValue = 1.0f,
+        targetValue = 1.15f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "waveScale"
+    )
+
+    Box(
+        modifier = modifier
+            .size(size)
+            .graphicsLayer {
+                scaleX = waveScale
+                scaleY = waveScale
+            }
+            .clip(CircleShape)
+            .background(color)
     )
 }

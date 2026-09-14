@@ -1249,46 +1249,8 @@ fun SophisticatedMessageBubble(
     val isDisappearing = message.isDisappearing()
     val isExpired = message.isMediaExpired()
 
-    val offsetY = remember { Animatable(28f) }
-    val alpha = remember { Animatable(0.2f) }
-    val scale = remember { Animatable(0.95f) }
-
-    LaunchedEffect(message.id) {
-        launch {
-            offsetY.animateTo(
-                targetValue = 0f,
-                animationSpec = spring(
-                    dampingRatio = 0.82f,
-                    stiffness = 380f
-                )
-            )
-        }
-        launch {
-            alpha.animateTo(
-                targetValue = 1f,
-                animationSpec = tween(durationMillis = 180)
-            )
-        }
-        launch {
-            scale.animateTo(
-                targetValue = 1f,
-                animationSpec = spring(
-                    dampingRatio = 0.82f,
-                    stiffness = 380f
-                )
-            )
-        }
-    }
-
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .graphicsLayer {
-                translationY = offsetY.value
-                this.alpha = alpha.value
-                scaleX = scale.value
-                scaleY = scale.value
-            },
+        modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start
     ) {
         Column(
@@ -1371,7 +1333,7 @@ fun SophisticatedMessageBubble(
                                         .clip(CircleShape)
                                         .background(
                                             if (resolvedType == MessageType.VIDEO) Color(0xFFFF8A65).copy(alpha = 0.2f)
-                                            else Color(0xFFFF4081).copy(alpha = 0.2f)
+                                             else Color(0xFFFF4081).copy(alpha = 0.2f)
                                         ),
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -1429,7 +1391,8 @@ fun SophisticatedMessageBubble(
                                 AsyncImage(
                                     model = ImageRequest.Builder(LocalContext.current)
                                         .data(message.fileUrl)
-                                        .crossfade(true)
+                                        .crossfade(150)
+                                        .precision(coil.size.Precision.INEXACT)
                                         .build(),
                                     contentDescription = message.text.ifBlank { "Shared photo" },
                                     contentScale = ContentScale.Crop,
@@ -1626,7 +1589,7 @@ fun SophisticatedMessageBubble(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = formatMessageTimestamp(message.timestamp).uppercase(),
+                    text = com.example.util.DateTimeUtils.formatMessageTime(message.timestamp).uppercase(),
                     color = TextSecondary,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Normal
@@ -1741,25 +1704,7 @@ fun TypingIndicator() {
 }
 
 private fun formatChatLastSeen(lastSeen: Long): String {
-    if (lastSeen <= 0) return "Offline"
-    val diff = System.currentTimeMillis() - lastSeen
-    val minutes = diff / (1000 * 60)
-    val hours = minutes / 60
-    val days = hours / 24
-
-    return when {
-        minutes < 1 -> "Last seen just now"
-        minutes < 60 -> "Last seen $minutes m ago"
-        hours < 24 -> "Last seen $hours h ago"
-        days < 7 -> "Last seen $days d ago"
-        else -> "Offline"
-    }
-}
-
-private fun formatMessageTimestamp(timestamp: Long): String {
-    if (timestamp <= 0) return ""
-    val sdf = SimpleDateFormat("h:mm a", Locale.getDefault())
-    return sdf.format(Date(timestamp))
+    return com.example.util.DateTimeUtils.formatLastSeen(lastSeen)
 }
 
 @Composable
