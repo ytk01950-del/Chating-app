@@ -76,7 +76,7 @@
         <!-- Firebase Cloud Messaging Handler -->
         <service
             android:name=".service.WpChatMessagingService"
-            android:exported="true">
+            android:exported="false">
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
@@ -84,7 +84,7 @@
 
         <meta-data
             android:name="firebase_messaging_auto_init_enabled"
-            android:value="true" />
+            android:value="false" />
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="nexa_messages_v4" />

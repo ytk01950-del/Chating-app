@@ -25,9 +25,12 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
@@ -42,6 +45,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -144,6 +148,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun WpChatApp(
     viewModel: ChatViewModel = viewModel(),
+    initialHasActiveSession: Boolean = false,
     currentThemeMode: AppThemeMode = AppThemeMode.SYSTEM,
     onThemeModeChange: (AppThemeMode) -> Unit = {}
 ) {
@@ -505,8 +510,15 @@ fun WpChatApp(
                 },
                 modifier = Modifier.fillMaxSize()
             ) { paddingValues ->
+            val hasActiveSession = initialHasActiveSession || (currentUser != null) || (try {
+                com.google.firebase.auth.FirebaseAuth.getInstance().currentUser != null
+            } catch (e: Exception) {
+                false
+            })
+
             AnimatedContent(
                 targetState = when {
+                    currentUser == null && hasActiveSession -> ScreenState.LoadingSession
                     currentUser == null -> ScreenState.Auth
                     isSettingsOpen -> ScreenState.Settings
                     viewingFollowersOfUser != null -> ScreenState.Followers
@@ -530,6 +542,20 @@ fun WpChatApp(
                 label = "ScreenTransition"
             ) { state ->
                 when (state) {
+                    ScreenState.LoadingSession -> {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                color = Color(0xFFFFCC00),
+                                strokeWidth = 3.dp
+                            )
+                        }
+                    }
+
                     ScreenState.Auth -> {
                         AuthScreen(
                             authUiState = authUiState,
@@ -967,6 +993,7 @@ fun WpChatApp(
 }
 
 enum class ScreenState {
+    LoadingSession,
     Auth,
     Directory,
     ProfileDetails,

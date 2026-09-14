@@ -67,51 +67,40 @@ fun NexaGeometricLogo(
 }
 
 /**
- * Premium Splash Screen with smooth zoom-in, soft white glow, and smooth fade-in animation.
+ * Splash Screen displaying only the uploaded black-and-white N logo on a clean black background
+ * with a smooth fade-in, gentle scale, and fade-out animation.
  */
 @Composable
 fun NexaSplashScreen(
     onAnimationFinished: () -> Unit
 ) {
     val alphaAnim = remember { Animatable(0f) }
-    val scaleAnim = remember { Animatable(0.70f) }
-    val glowAlpha = remember { Animatable(0f) }
-
-    val infiniteTransition = rememberInfiniteTransition(label = "softGlowPulse")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.06f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1400, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulseScale"
-    )
+    val scaleAnim = remember { Animatable(0.90f) }
 
     LaunchedEffect(Unit) {
-        // Fade in logo & glow smoothly
+        // Smooth fade-in and subtle scale-in of the uploaded logo
         launch {
             alphaAnim.animateTo(
                 targetValue = 1f,
-                animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing)
+                animationSpec = tween(durationMillis = 700, easing = FastOutSlowInEasing)
             )
         }
-        // Smooth zoom-in animation (70% to 100%)
         launch {
             scaleAnim.animateTo(
                 targetValue = 1f,
-                animationSpec = tween(durationMillis = 1100, easing = FastOutSlowInEasing)
+                animationSpec = tween(durationMillis = 850, easing = FastOutSlowInEasing)
             )
         }
-        // Soft white glow fade-in
-        launch {
-            glowAlpha.animateTo(
-                targetValue = 0.85f,
-                animationSpec = tween(durationMillis = 900, easing = FastOutSlowInEasing)
-            )
-        }
-        // Brief hold to enjoy the logo before smoothly entering login
-        delay(1500)
+
+        // Display hold duration
+        delay(1200)
+
+        // Smooth fade-out before entering the app
+        alphaAnim.animateTo(
+            targetValue = 0f,
+            animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing)
+        )
+
         onAnimationFinished()
     }
 
@@ -121,34 +110,12 @@ fun NexaSplashScreen(
             .background(Color(0xFF000000)),
         contentAlignment = Alignment.Center
     ) {
-        // Soft White Glow Halo
-        Box(
-            modifier = Modifier
-                .size(260.dp)
-                .graphicsLayer {
-                    alpha = glowAlpha.value * alphaAnim.value
-                    scaleX = pulseScale
-                    scaleY = pulseScale
-                }
-                .background(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            Color(0x3FFFFFFF),
-                            Color(0x1AFFFFFF),
-                            Color(0x05FFFFFF),
-                            Color.Transparent
-                        )
-                    ),
-                    shape = CircleShape
-                )
-        )
-
-        // Main Animated Logo Image
+        // Centered uploaded N logo
         Image(
             painter = painterResource(id = R.drawable.nexa_logo),
-            contentDescription = "App Logo",
+            contentDescription = "N Logo",
             modifier = Modifier
-                .size(116.dp)
+                .size(130.dp)
                 .graphicsLayer {
                     alpha = alphaAnim.value
                     scaleX = scaleAnim.value

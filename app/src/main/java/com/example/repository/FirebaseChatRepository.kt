@@ -215,6 +215,12 @@ class FirebaseChatRepository {
     suspend fun syncFcmToken(userId: String) {
         if (userId.isBlank()) return
         try {
+            val availability = com.google.android.gms.common.GoogleApiAvailability.getInstance()
+            val status = availability.isGooglePlayServicesAvailable(com.example.ChatApplication.instance)
+            if (status != com.google.android.gms.common.ConnectionResult.SUCCESS) {
+                Log.d(tag, "Google Play Services not available for FCM token sync ($status)")
+                return
+            }
             val messaging = com.google.firebase.messaging.FirebaseMessaging.getInstance()
             val token = messaging.token.await()
             if (!token.isNullOrBlank()) {

@@ -39,10 +39,22 @@ class ChatViewModel(
     private val repository: FirebaseChatRepository = FirebaseChatRepository()
 ) : ViewModel() {
 
-    private val _authUiState = MutableStateFlow<AuthUiState>(AuthUiState.Idle)
+    private val initialFbUser = repository.currentFirebaseUser
+    private val initialUser = initialFbUser?.let { fbUser ->
+        User(
+            id = fbUser.uid,
+            email = fbUser.email ?: "",
+            displayName = fbUser.displayName ?: fbUser.email?.substringBefore("@") ?: "User",
+            isOnline = true
+        )
+    }
+
+    private val _authUiState = MutableStateFlow<AuthUiState>(
+        if (initialUser != null) AuthUiState.Authenticated(initialUser) else AuthUiState.Idle
+    )
     val authUiState: StateFlow<AuthUiState> = _authUiState.asStateFlow()
 
-    private val _currentUser = MutableStateFlow<User?>(null)
+    private val _currentUser = MutableStateFlow<User?>(initialUser)
     val currentUser: StateFlow<User?> = _currentUser.asStateFlow()
 
     private val _allUsers = MutableStateFlow<List<User>>(emptyList())
@@ -259,17 +271,14 @@ class ChatViewModel(
     private fun checkCurrentAuth() {
         val fbUser = repository.currentFirebaseUser
         if (fbUser != null) {
+            startObservingUsers(fbUser.uid)
             viewModelScope.launch {
-                val profile = repository.fetchUserProfile(fbUser.uid) ?: User(
-                    id = fbUser.uid,
-                    email = fbUser.email ?: "",
-                    displayName = fbUser.displayName ?: fbUser.email?.substringBefore("@") ?: "User",
-                    isOnline = true
-                )
-                _currentUser.value = profile
-                _authUiState.value = AuthUiState.Authenticated(profile)
-                repository.updateUserOnlineStatus(profile.id, true)
-                startObservingUsers(profile.id)
+                val profile = repository.fetchUserProfile(fbUser.uid)
+                if (profile != null) {
+                    _currentUser.value = profile
+                    _authUiState.value = AuthUiState.Authenticated(profile)
+                }
+                repository.updateUserOnlineStatus(fbUser.uid, true)
             }
         }
     }
