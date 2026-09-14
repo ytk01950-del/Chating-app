@@ -1,10 +1,5 @@
 package com.example.ui.components
 
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -13,20 +8,21 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import coil.size.Precision
 import com.example.ui.theme.DarkSurface
 import com.example.ui.theme.OfflineGray
 import com.example.ui.theme.OnlineGreen
@@ -55,34 +51,39 @@ fun UserAvatar(
 ) {
     val colorIndex = (avatarId.coerceAtLeast(0)) % AvatarColorPairs.size
     val (bgColor, textColor) = AvatarColorPairs[colorIndex]
-    val initials = if (name.isNotBlank()) {
-        val parts = name.trim().split(" ")
-        if (parts.size >= 2) "${parts[0].take(1)}${parts[1].take(1)}".uppercase()
-        else name.take(2).uppercase()
-    } else "??"
+    val initials = remember(name) {
+        if (name.isNotBlank()) {
+            val parts = name.trim().split(" ").filter { it.isNotBlank() }
+            if (parts.size >= 2) "${parts[0].take(1)}${parts[1].take(1)}".uppercase()
+            else name.take(2).uppercase()
+        } else "??"
+    }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.25f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1200),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulseScale"
-    )
+    val context = LocalContext.current
+    val density = LocalDensity.current
+    val sizePx = remember(size, density) {
+        with(density) { size.roundToPx() }
+    }
+
+    val imageRequest = remember(photoUrl, sizePx) {
+        if (photoUrl.isNotBlank()) {
+            ImageRequest.Builder(context)
+                .data(photoUrl)
+                .size(sizePx, sizePx)
+                .precision(Precision.INEXACT)
+                .crossfade(150)
+                .build()
+        } else null
+    }
 
     Box(
         modifier = modifier.size(size),
         contentAlignment = Alignment.Center
     ) {
         // Main Avatar Circle
-        if (photoUrl.isNotBlank()) {
+        if (imageRequest != null) {
             AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(photoUrl)
-                    .crossfade(true)
-                    .build(),
+                model = imageRequest,
                 contentDescription = "Profile photo of $name",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
@@ -113,15 +114,14 @@ fun UserAvatar(
             val badgeOffset = (size * 0.04f)
 
             if (isOnline) {
-                // Pulsing glow behind
+                // Subtle static halo behind online badge without continuous frame recomposition
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .offset(x = -badgeOffset, y = -badgeOffset)
-                        .size(badgeSize)
-                        .scale(pulseScale)
+                        .offset(x = -badgeOffset + 1.dp, y = -badgeOffset + 1.dp)
+                        .size(badgeSize + 3.dp)
                         .clip(CircleShape)
-                        .background(OnlineGreen.copy(alpha = 0.35f))
+                        .background(OnlineGreen.copy(alpha = 0.28f))
                 )
             }
 
@@ -137,3 +137,4 @@ fun UserAvatar(
         }
     }
 }
+

@@ -177,90 +177,85 @@ fun SocialProfileScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            Surface(
-                color = DarkSurface,
-                modifier = Modifier.fillMaxWidth()
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(DarkBg)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            // Natural Top Header
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                AppIconButton(
+                    icon = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    onClick = onBack,
+                    size = 38.dp,
+                    iconSize = 22.dp,
+                    testTag = "profile_back_button"
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = if (profileUser.username.isNotBlank()) "@${profileUser.username}" else profileUser.displayName,
+                            color = TextPrimary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (profileUser.isOnline) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(OnlineGreen)
+                            )
+                        }
+                    }
+                    Text(
+                        text = if (isOwnProfile) "Your Profile & Stories" else "User Profile",
+                        color = TextMuted,
+                        fontSize = 12.sp
+                    )
+                }
+
+                if (isOwnProfile) {
                     AppIconButton(
-                        icon = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        onClick = onBack,
+                        icon = Icons.Default.Add,
+                        contentDescription = "Add Story",
+                        onClick = {
+                            photoStoryPickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        },
+                        tint = AccentBlue,
                         size = 38.dp,
                         iconSize = 22.dp,
-                        testTag = "profile_back_button"
+                        testTag = "header_add_story_button"
                     )
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = if (profileUser.username.isNotBlank()) "@${profileUser.username}" else profileUser.displayName,
-                                color = TextPrimary,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 18.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            if (profileUser.isOnline) {
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Box(
-                                    modifier = Modifier
-                                        .size(8.dp)
-                                        .clip(CircleShape)
-                                        .background(OnlineGreen)
-                                )
-                            }
-                        }
-                        Text(
-                            text = if (isOwnProfile) "Your Profile & Stories" else "User Profile",
-                            color = TextMuted,
-                            fontSize = 12.sp
-                        )
-                    }
-
-                    if (isOwnProfile) {
-                        AppIconButton(
-                            icon = Icons.Default.Add,
-                            contentDescription = "Add Story",
-                            onClick = {
-                                photoStoryPickerLauncher.launch(
-                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                )
-                            },
-                            tint = AccentBlue,
-                            size = 38.dp,
-                            iconSize = 22.dp,
-                            testTag = "header_add_story_button"
-                        )
-                        AppIconButton(
-                            icon = Icons.Default.Edit,
-                            contentDescription = "Edit Profile",
-                            onClick = { showEditProfileDialog = true },
-                            tint = TextSecondary,
-                            size = 38.dp,
-                            iconSize = 20.dp,
-                            testTag = "header_edit_profile_button"
-                        )
-                    }
+                    AppIconButton(
+                        icon = Icons.Default.Edit,
+                        contentDescription = "Edit Profile",
+                        onClick = { showEditProfileDialog = true },
+                        tint = TextSecondary,
+                        size = 38.dp,
+                        iconSize = 20.dp,
+                        testTag = "header_edit_profile_button"
+                    )
                 }
             }
-        },
-        containerColor = DarkBg
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
+
             // Profile Info Header Card
             Card(
                 colors = CardDefaults.cardColors(containerColor = DarkSurface),

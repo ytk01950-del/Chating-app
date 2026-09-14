@@ -1,5 +1,9 @@
 package com.example.model
 
+import androidx.compose.runtime.Immutable
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+
 enum class MessageType {
     TEXT,
     IMAGE,
@@ -10,15 +14,19 @@ enum class MessageType {
     AUDIO
 }
 
+@Immutable
+@Entity(tableName = "chat_messages")
 data class ChatMessage(
+    @PrimaryKey
     val id: String = "",
+    val chatId: String = "",
     val senderId: String = "",
     val senderName: String = "",
     val receiverId: String = "",
     val text: String = "",
     val timestamp: Long = System.currentTimeMillis(),
     val isRead: Boolean = false,
-    val status: String = "sent", // "sent", "delivered", "seen"
+    val status: String = "sent", // "sending", "sent", "delivered", "seen", "failed"
     val deliveredAt: Long = 0L,
     val seenAt: Long = 0L,
     val reaction: String = "",

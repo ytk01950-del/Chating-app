@@ -145,77 +145,6 @@ fun UserDirectoryScreen(
             .fillMaxSize()
             .imePadding(),
         containerColor = colors.background,
-        topBar = {
-            if (selectedTab != NavigationTab.PROFILE) {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = if (colors.isDark) Color(0xFF000000) else colors.surface,
-                    border = BorderStroke(1.dp, if (colors.isDark) Color(0xFF262626) else colors.border)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = when (selectedTab) {
-                                NavigationTab.CHATS -> "Chats"
-                                NavigationTab.CALLS -> "Calls"
-                                NavigationTab.STORIES -> "Stories"
-                                NavigationTab.PROFILE -> "Profile"
-                            },
-                            style = MaterialTheme.typography.headlineMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 26.sp,
-                                letterSpacing = (-0.5).sp
-                            ),
-                            color = colors.textPrimary,
-                            modifier = Modifier.testTag("dynamic_tab_title")
-                        )
-
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            IconButton(
-                                onClick = onOpenAddStory,
-                                modifier = Modifier
-                                    .size(42.dp)
-                                    .testTag("top_bar_camera_action")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.CameraAlt,
-                                    contentDescription = "Camera",
-                                    tint = colors.textPrimary,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                            }
-
-                            IconButton(
-                                onClick = {
-                                    if (selectedTab != NavigationTab.CHATS) {
-                                        selectedTab = NavigationTab.CHATS
-                                    }
-                                    isSearchUsersMode = !isSearchUsersMode
-                                },
-                                modifier = Modifier
-                                    .size(42.dp)
-                                    .testTag("top_bar_search_action")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Search,
-                                    contentDescription = "Search",
-                                    tint = if (isSearchUsersMode) colors.accentOrange else colors.textPrimary,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        },
         bottomBar = {
             FloatingBottomNavBar(
                 selectedTab = selectedTab,
@@ -229,7 +158,6 @@ fun UserDirectoryScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = paddingValues.calculateTopPadding())
                 .background(colors.background)
         ) {
             AnimatedContent(
@@ -345,132 +273,147 @@ private fun ChatsTabView(
 ) {
     val colors = AppTheme.colors
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        // Claim username banner
-        if (needsUsername) {
-            Surface(
-                color = if (colors.isDark) Color(0xFF262626) else Color(0xFFF0F7FF),
-                border = BorderStroke(1.dp, if (colors.isDark) Color(0xFF363636) else Color(0xFFBFDBFE)),
-                shape = RoundedCornerShape(12.dp),
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag("chats_directory_list"),
+        contentPadding = PaddingValues(bottom = 90.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // 1. Natural Collapsing Screen Header (Title + Camera + Search)
+        item(key = "chats_screen_header") {
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 6.dp)
-                    .clickableWithPress { onOpenProfile() }
-                    .testTag("claim_username_banner")
+                    .padding(start = 20.dp, end = 16.dp, top = 16.dp, bottom = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                Text(
+                    text = "Chats",
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 28.sp,
+                        letterSpacing = (-0.5).sp
+                    ),
+                    color = colors.textPrimary,
+                    modifier = Modifier.testTag("dynamic_tab_title")
+                )
+
                 Row(
-                    modifier = Modifier.padding(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.WarningAmber,
-                        contentDescription = null,
-                        tint = colors.textPrimary,
-                        modifier = Modifier.size(22.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Choose Your Unique Chat ID",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = colors.textPrimary
+                    IconButton(
+                        onClick = onOpenAddStory,
+                        modifier = Modifier
+                            .size(42.dp)
+                            .testTag("top_bar_camera_action")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CameraAlt,
+                            contentDescription = "Camera",
+                            tint = colors.textPrimary,
+                            modifier = Modifier.size(22.dp)
                         )
-                        Text(
-                            text = "Tap here to claim your @ChatID in Settings so others can find you.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = colors.textSecondary,
-                            fontSize = 12.sp
+                    }
+
+                    IconButton(
+                        onClick = { onToggleSearchUsersMode(!isSearchUsersMode) },
+                        modifier = Modifier
+                            .size(42.dp)
+                            .testTag("top_bar_search_action")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Search",
+                            tint = if (isSearchUsersMode) colors.accentOrange else colors.textPrimary,
+                            modifier = Modifier.size(22.dp)
                         )
                     }
                 }
             }
         }
 
-        // Active Story Tray (Quick 24-Hour Stories Access)
-        StoryTray(
-            currentUser = currentUser,
-            myStories = myStories,
-            otherUsersStories = groupedStories,
-            onOpenAddStory = onOpenAddStory,
-            onViewUserStories = onViewUserStories
-        )
-
-        // Search and Filter Bar
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
-            if (!isSearchUsersMode) {
-                // Chats Search Field
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = onSearchQueryChange,
-                    placeholder = {
-                        Text(
-                            "Filter chats by name or @chat_id...",
-                            color = Color(0xFF9E9E9E),
-                            fontSize = 14.sp
-                        )
-                    },
-                    leadingIcon = {
-                        Icon(
-                            Icons.Default.Search,
-                            contentDescription = "Search",
-                            tint = Color(0xFF9E9E9E)
-                        )
-                    },
-                    trailingIcon = {
-                        if (searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { onSearchQueryChange("") }) {
-                                Icon(
-                                    Icons.Default.Clear,
-                                    contentDescription = "Clear",
-                                    tint = colors.textSecondary
-                                )
-                            }
-                        }
-                    },
-                    singleLine = true,
-                    shape = RoundedCornerShape(24.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = colors.textPrimary,
-                        unfocusedTextColor = colors.textPrimary,
-                        focusedContainerColor = if (colors.isDark) Color(0xFF262626) else Color(0xFFEFEFEF),
-                        unfocusedContainerColor = if (colors.isDark) Color(0xFF262626) else Color(0xFFEFEFEF),
-                        focusedBorderColor = colors.textPrimary,
-                        unfocusedBorderColor = if (colors.isDark) Color(0xFF363636) else Color(0xFFDBDBDB)
-                    ),
+        // 2. Claim username banner
+        if (needsUsername) {
+            item(key = "claim_username_banner") {
+                Surface(
+                    color = if (colors.isDark) Color(0xFF262626) else Color(0xFFF0F7FF),
+                    border = BorderStroke(1.dp, if (colors.isDark) Color(0xFF363636) else Color(0xFFBFDBFE)),
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .testTag("search_user_input")
-                )
-            } else {
-                // Global User Directory Search Field
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                        .clickableWithPress { onOpenProfile() }
+                        .testTag("claim_username_banner")
                 ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.WarningAmber,
+                            contentDescription = null,
+                            tint = colors.textPrimary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Choose Your Unique Chat ID",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = colors.textPrimary
+                            )
+                            Text(
+                                text = "Tap here to claim your @ChatID in Settings so others can find you.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = colors.textSecondary,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. Active Story Tray (Quick 24-Hour Stories Access)
+        item(key = "story_tray_section") {
+            StoryTray(
+                currentUser = currentUser,
+                myStories = myStories,
+                otherUsersStories = groupedStories,
+                onOpenAddStory = onOpenAddStory,
+                onViewUserStories = onViewUserStories
+            )
+        }
+
+        // 4. Search and Filter Bar
+        item(key = "search_and_filters_section") {
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+                if (!isSearchUsersMode) {
+                    // Chats Search Field
                     OutlinedTextField(
-                        value = searchUserQuery,
-                        onValueChange = { input ->
-                            val clean = input.filter { it.isLetterOrDigit() || it == '_' || it == '.' || it == '@' || it == ' ' }
-                            onSearchUserQueryChange(clean)
-                            onClearChatIdSearch()
-                        },
+                        value = searchQuery,
+                        onValueChange = onSearchQueryChange,
                         placeholder = {
-                            Text("Search @chat_id or display name...", color = Color(0xFF9E9E9E), fontSize = 13.sp)
+                            Text(
+                                "Filter chats by name or @chat_id...",
+                                color = Color(0xFF9E9E9E),
+                                fontSize = 14.sp
+                            )
                         },
                         leadingIcon = {
                             Icon(
-                                Icons.Default.PersonSearch,
-                                contentDescription = "Search Users",
+                                Icons.Default.Search,
+                                contentDescription = "Search",
                                 tint = Color(0xFF9E9E9E)
                             )
                         },
                         trailingIcon = {
-                            if (searchUserQuery.isNotEmpty()) {
-                                IconButton(onClick = {
-                                    onSearchUserQueryChange("")
-                                    onClearChatIdSearch()
-                                }) {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { onSearchQueryChange("") }) {
                                     Icon(
                                         Icons.Default.Clear,
                                         contentDescription = "Clear",
@@ -490,82 +433,130 @@ private fun ChatsTabView(
                             unfocusedBorderColor = if (colors.isDark) Color(0xFF363636) else Color(0xFFDBDBDB)
                         ),
                         modifier = Modifier
-                            .weight(1f)
-                            .testTag("chat_id_search_input")
+                            .fillMaxWidth()
+                            .testTag("search_user_input")
                     )
+                } else {
+                    // Global User Directory Search Field
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = searchUserQuery,
+                            onValueChange = { input ->
+                                val clean = input.filter { it.isLetterOrDigit() || it == '_' || it == '.' || it == '@' || it == ' ' }
+                                onSearchUserQueryChange(clean)
+                                onClearChatIdSearch()
+                            },
+                            placeholder = {
+                                Text("Search @chat_id or display name...", color = Color(0xFF9E9E9E), fontSize = 13.sp)
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Default.PersonSearch,
+                                    contentDescription = "Search Users",
+                                    tint = Color(0xFF9E9E9E)
+                                )
+                            },
+                            trailingIcon = {
+                                if (searchUserQuery.isNotEmpty()) {
+                                    IconButton(onClick = {
+                                        onSearchUserQueryChange("")
+                                        onClearChatIdSearch()
+                                    }) {
+                                        Icon(
+                                            Icons.Default.Clear,
+                                            contentDescription = "Clear",
+                                            tint = colors.textSecondary
+                                        )
+                                    }
+                                }
+                            },
+                            singleLine = true,
+                            shape = RoundedCornerShape(24.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = colors.textPrimary,
+                                unfocusedTextColor = colors.textPrimary,
+                                focusedContainerColor = if (colors.isDark) Color(0xFF262626) else Color(0xFFEFEFEF),
+                                unfocusedContainerColor = if (colors.isDark) Color(0xFF262626) else Color(0xFFEFEFEF),
+                                focusedBorderColor = colors.textPrimary,
+                                unfocusedBorderColor = if (colors.isDark) Color(0xFF363636) else Color(0xFFDBDBDB)
+                            ),
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("chat_id_search_input")
+                        )
 
-                    Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
 
-                    AppPrimaryButton(
-                        text = "Find",
-                        onClick = {
-                            onSearchByChatId(searchUserQuery)
-                            onSearchDirectory(searchUserQuery)
-                        },
-                        isLoading = isSearchingUser,
-                        enabled = searchUserQuery.trim().length >= 2 && !isSearchingUser,
-                        height = 48.dp,
-                        testTag = "chat_id_search_button"
-                    )
+                        AppPrimaryButton(
+                            text = "Find",
+                            onClick = {
+                                onSearchByChatId(searchUserQuery)
+                                onSearchDirectory(searchUserQuery)
+                            },
+                            isLoading = isSearchingUser,
+                            enabled = searchUserQuery.trim().length >= 2 && !isSearchingUser,
+                            height = 48.dp,
+                            testTag = "chat_id_search_button"
+                        )
+                    }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-            // Filter Chips Row
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                item {
-                    AppFilterChip(
-                        selected = !isSearchUsersMode && !filterOnlineOnly,
-                        onClick = {
-                            onToggleSearchUsersMode(false)
-                            if (filterOnlineOnly) onToggleOnlineFilter()
-                        },
-                        label = "All Chats",
-                        badgeCount = users.size
-                    )
-                }
-                item {
-                    AppFilterChip(
-                        selected = !isSearchUsersMode && filterOnlineOnly,
-                        onClick = {
-                            onToggleSearchUsersMode(false)
-                            if (!filterOnlineOnly) onToggleOnlineFilter()
-                        },
-                        label = "Online",
-                        badgeCount = onlineCount,
-                        showOnlineDot = true
-                    )
-                }
-                item {
-                    AppFilterChip(
-                        selected = isSearchUsersMode,
-                        onClick = {
-                            onToggleSearchUsersMode(!isSearchUsersMode)
-                        },
-                        label = "Find @ChatID",
-                        badgeCount = if (searchResults.isNotEmpty()) searchResults.size else 0
-                    )
+                // Filter Chips Row
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    item {
+                        AppFilterChip(
+                            selected = !isSearchUsersMode && !filterOnlineOnly,
+                            onClick = {
+                                onToggleSearchUsersMode(false)
+                                if (filterOnlineOnly) onToggleOnlineFilter()
+                            },
+                            label = "All Chats",
+                            badgeCount = users.size
+                        )
+                    }
+                    item {
+                        AppFilterChip(
+                            selected = !isSearchUsersMode && filterOnlineOnly,
+                            onClick = {
+                                onToggleSearchUsersMode(false)
+                                if (!filterOnlineOnly) onToggleOnlineFilter()
+                            },
+                            label = "Online",
+                            badgeCount = onlineCount,
+                            showOnlineDot = true
+                        )
+                    }
+                    item {
+                        AppFilterChip(
+                            selected = isSearchUsersMode,
+                            onClick = {
+                                onToggleSearchUsersMode(!isSearchUsersMode)
+                            },
+                            label = "Find @ChatID",
+                            badgeCount = if (searchResults.isNotEmpty()) searchResults.size else 0
+                        )
+                    }
                 }
             }
         }
 
-        // Body Content
+        // 5. Body Content (Search or Chat list)
         if (isSearchUsersMode) {
-            // Search Users Mode Body
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                contentAlignment = Alignment.TopCenter
-            ) {
-                when {
-                    isSearchingUser -> {
+            when {
+                isSearchingUser -> {
+                    item(key = "search_loading") {
                         Column(
-                            modifier = Modifier.padding(top = 40.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 40.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             CircularProgressIndicator(color = colors.accentOrange)
@@ -577,93 +568,97 @@ private fun ChatsTabView(
                             )
                         }
                     }
-                    searchUserResult != null -> {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("matched_user_card"),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = colors.cardBackground),
-                            border = BorderStroke(1.dp, colors.border)
-                        ) {
-                            Column(
+                }
+                searchUserResult != null -> {
+                    item(key = "search_single_match") {
+                        Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                            Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(20.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
+                                    .testTag("matched_user_card"),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = colors.cardBackground),
+                                border = BorderStroke(1.dp, colors.border)
                             ) {
-                                UserAvatar(
-                                    name = searchUserResult.displayName.ifBlank { searchUserResult.username },
-                                    avatarId = searchUserResult.avatarId,
-                                    photoUrl = searchUserResult.photoUrl,
-                                    size = 72.dp,
-                                    isOnline = searchUserResult.isOnline
-                                )
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(20.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    UserAvatar(
+                                        name = searchUserResult.displayName.ifBlank { searchUserResult.username },
+                                        avatarId = searchUserResult.avatarId,
+                                        photoUrl = searchUserResult.photoUrl,
+                                        size = 72.dp,
+                                        isOnline = searchUserResult.isOnline
+                                    )
 
-                                Spacer(modifier = Modifier.height(12.dp))
+                                    Spacer(modifier = Modifier.height(12.dp))
 
-                                Text(
-                                    text = searchUserResult.displayName,
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    color = colors.textPrimary
-                                )
-
-                                if (searchUserResult.username.isNotBlank()) {
                                     Text(
-                                        text = "@${searchUserResult.username}",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = colors.accentOrange
+                                        text = searchUserResult.displayName,
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = colors.textPrimary
+                                    )
+
+                                    if (searchUserResult.username.isNotBlank()) {
+                                        Text(
+                                            text = "@${searchUserResult.username}",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = colors.accentOrange
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    Text(
+                                        text = searchUserResult.statusMessage,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = colors.textSecondary
+                                    )
+
+                                    Spacer(modifier = Modifier.height(20.dp))
+
+                                    AppPrimaryButton(
+                                        text = "Message @${searchUserResult.username.ifBlank { searchUserResult.displayName }}",
+                                        onClick = { onSelectUser(searchUserResult) },
+                                        icon = Icons.AutoMirrored.Filled.Chat,
+                                        height = 48.dp,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        testTag = "message_matched_user_button"
                                     )
                                 }
-
-                                Spacer(modifier = Modifier.height(8.dp))
-
-                                Text(
-                                    text = searchUserResult.statusMessage,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = colors.textSecondary
-                                )
-
-                                Spacer(modifier = Modifier.height(20.dp))
-
-                                AppPrimaryButton(
-                                    text = "Message @${searchUserResult.username.ifBlank { searchUserResult.displayName }}",
-                                    onClick = { onSelectUser(searchUserResult) },
-                                    icon = Icons.AutoMirrored.Filled.Chat,
-                                    height = 48.dp,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    testTag = "message_matched_user_button"
-                                )
                             }
                         }
                     }
-                    searchResults.isNotEmpty() -> {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(bottom = 90.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            item {
-                                Text(
-                                    text = "Matching Users (${searchResults.size})",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = colors.accentOrange,
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
-                            }
-                            items(searchResults, key = { it.id }) { matchedUser ->
-                                UserItemCard(
-                                    user = matchedUser,
-                                    onClick = { onSelectUser(matchedUser) }
-                                )
-                            }
+                }
+                searchResults.isNotEmpty() -> {
+                    item(key = "search_results_header") {
+                        Text(
+                            text = "Matching Users (${searchResults.size})",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = colors.accentOrange,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                        )
+                    }
+                    items(searchResults, key = { "search_${it.id}" }) { matchedUser ->
+                        Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                            UserItemCard(
+                                user = matchedUser,
+                                onClick = { onSelectUser(matchedUser) }
+                            )
                         }
                     }
-                    searchUserNotFound -> {
+                }
+                searchUserNotFound -> {
+                    item(key = "search_not_found") {
                         Column(
-                            modifier = Modifier.padding(top = 40.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 40.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Box(
@@ -695,9 +690,13 @@ private fun ChatsTabView(
                             )
                         }
                     }
-                    else -> {
+                }
+                else -> {
+                    item(key = "search_default_prompt") {
                         Column(
-                            modifier = Modifier.padding(top = 40.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp, vertical = 40.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Icon(
@@ -718,8 +717,7 @@ private fun ChatsTabView(
                                 text = "Enter another user's unique @ChatID or display name above to find them and start a conversation.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = colors.textSecondary,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.padding(horizontal = 24.dp)
+                                textAlign = TextAlign.Center
                             )
                         }
                     }
@@ -728,61 +726,59 @@ private fun ChatsTabView(
         } else {
             // Main Conversation List
             if (displayedUsers.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(32.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
+                item(key = "empty_conversations") {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(32.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(64.dp)
-                                .clip(CircleShape)
-                                .background(colors.surface),
-                            contentAlignment = Alignment.Center
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.Chat,
-                                contentDescription = null,
-                                tint = colors.textMuted,
-                                modifier = Modifier.size(32.dp)
+                            Box(
+                                modifier = Modifier
+                                    .size(64.dp)
+                                    .clip(CircleShape)
+                                    .background(colors.surface),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.Chat,
+                                    contentDescription = null,
+                                    tint = colors.textMuted,
+                                    modifier = Modifier.size(32.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = if (searchQuery.isNotEmpty()) "No matching conversations found" else "No active conversations yet",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = colors.textPrimary
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = if (searchQuery.isNotEmpty()) "Try searching by their exact Chat ID or name in Search tab." else "Your direct messages will appear here. Find someone by their @ChatID or name to begin chatting!",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = colors.textSecondary,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            AppPrimaryButton(
+                                text = "Find Users to Chat",
+                                onClick = { onToggleSearchUsersMode(true) },
+                                icon = Icons.Default.Search,
+                                height = 44.dp
                             )
                         }
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = if (searchQuery.isNotEmpty()) "No matching conversations found" else "No active conversations yet",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = colors.textPrimary
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = if (searchQuery.isNotEmpty()) "Try searching by their exact Chat ID or name in Search tab." else "Your direct messages will appear here. Find someone by their @ChatID or name to begin chatting!",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = colors.textSecondary,
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        AppPrimaryButton(
-                            text = "Find Users to Chat",
-                            onClick = { onToggleSearchUsersMode(true) },
-                            icon = Icons.Default.Search,
-                            height = 44.dp
-                        )
                     }
                 }
             } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 90.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    items(displayedUsers, key = { it.id }) { user ->
-                        val userStoryGroup = groupedStories.firstOrNull { it.user.id == user.id }
+                items(displayedUsers, key = { it.id }) { user ->
+                    val userStoryGroup = groupedStories.firstOrNull { it.user.id == user.id }
+                    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)) {
                         UserItemCard(
                             user = user,
                             userStories = userStoryGroup?.stories ?: emptyList(),
@@ -880,7 +876,7 @@ fun UserItemCard(
                     val statusText = if (user.isOnline) {
                         "Online"
                     } else {
-                        formatLastSeen(user.lastSeen)
+                        com.example.util.DateTimeUtils.formatLastSeen(user.lastSeen)
                     }
                     Text(
                         text = statusText,
@@ -911,16 +907,5 @@ fun UserItemCard(
                 iconSize = 18.dp
             )
         }
-    }
-}
-
-fun formatLastSeen(timestamp: Long): String {
-    if (timestamp <= 0) return "Offline"
-    val diff = System.currentTimeMillis() - timestamp
-    return when {
-        diff < 60_000 -> "Just now"
-        diff < 3600_000 -> "${diff / 60_000}m ago"
-        diff < 86400_000 -> "${diff / 3600_000}h ago"
-        else -> SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(timestamp))
     }
 }

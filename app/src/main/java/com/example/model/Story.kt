@@ -1,5 +1,8 @@
 package com.example.model
 
+import androidx.compose.runtime.Immutable
+
+@Immutable
 data class Story(
     val storyId: String = "",
     val userId: String = "",
@@ -41,6 +44,7 @@ data class Story(
     }
 }
 
+@Immutable
 data class UserStoryGroup(
     val user: User,
     val stories: List<Story> = emptyList(),

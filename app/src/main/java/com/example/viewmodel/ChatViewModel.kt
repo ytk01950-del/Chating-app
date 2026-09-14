@@ -603,20 +603,50 @@ class ChatViewModel(
         _selectedProfileUser.value = null
         val chatId = repository.getChatId(user.id, otherUser.id)
 
-        // Mark incoming messages as read & delivered
+        // 1. Immediately load cached messages from local Room DB into StateFlow
         viewModelScope.launch {
+            try {
+                val cached = com.example.ChatApplication.database.chatMessageDao()
+                    .getMessagesForChatDirect(chatId, user.id, otherUser.id)
+                if (cached.isNotEmpty()) {
+                    _activeMessages.value = cached
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("ChatViewModel", "Cached messages load error: ${e.message}")
+            }
+        }
+
+        // 2. Mark incoming messages as read & delivered locally and in Firebase
+        viewModelScope.launch {
+            try {
+                com.example.ChatApplication.database.chatMessageDao().markMessagesDelivered(chatId, user.id, otherUser.id)
+                com.example.ChatApplication.database.chatMessageDao().markMessagesRead(chatId, user.id, otherUser.id)
+            } catch (e: Exception) {
+                // ignore
+            }
             repository.markMessagesAsDelivered(chatId, user.id)
             repository.markMessagesAsRead(chatId, user.id)
         }
 
-        // Observe messages
+        // 3. Real-time Firebase & local sync observer
         messagesJob?.cancel()
         messagesJob = viewModelScope.launch {
-            repository.observeMessages(chatId).collect { msgList ->
-                _activeMessages.value = msgList
+            repository.observeMessages(chatId).collect { remoteMsgList ->
+                // Merge remote messages with local pending messages (status == "sending")
+                val pendingSending = _activeMessages.value.filter { it.status == "sending" }
+                val remoteIds = remoteMsgList.map { it.id }.toSet()
+                val unconfirmed = pendingSending.filter { it.id !in remoteIds }
+                val combined = (remoteMsgList + unconfirmed).sortedBy { it.timestamp }
+                _activeMessages.value = combined
+
                 // Check if any incoming unread messages need reading
-                if (msgList.any { it.receiverId == user.id && (!it.isRead || it.status != "seen") }) {
+                if (remoteMsgList.any { it.receiverId == user.id && (!it.isRead || it.status != "seen") }) {
                     repository.markMessagesAsRead(chatId, user.id)
+                    try {
+                        com.example.ChatApplication.database.chatMessageDao().markMessagesRead(chatId, user.id, otherUser.id)
+                    } catch (e: Exception) {
+                        // ignore
+                    }
                 }
             }
         }
@@ -669,11 +699,73 @@ class ChatViewModel(
         val contact = _activeContact.value ?: return
         val chatId = repository.getChatId(user.id, contact.id)
 
+        // 1. Generate unique client-side message ID
+        val msgId = "msg_${System.currentTimeMillis()}_${(1000..9999).random()}"
+        val now = System.currentTimeMillis()
+
+        val optimisticMessage = ChatMessage(
+            id = msgId,
+            chatId = chatId,
+            senderId = user.id,
+            senderName = user.displayName.ifBlank { user.username },
+            receiverId = contact.id,
+            text = messageText,
+            timestamp = now,
+            isRead = false,
+            status = "sending",
+            messageType = MessageType.TEXT.name
+        )
+
+        // 2. Instant Local Room DB Sync & Immediate StateFlow UI Emission
+        val currentList = _activeMessages.value
+        _activeMessages.value = currentList + optimisticMessage
+
         viewModelScope.launch {
-            val result = repository.sendMessage(chatId, user, contact.id, messageText)
-            result.onFailure {
-                _errorMessage.value = "Failed to send message: ${it.localizedMessage}"
+            // Save to local Room/SQLite database immediately
+            try {
+                com.example.ChatApplication.database.chatMessageDao().insertMessage(optimisticMessage)
+            } catch (e: Exception) {
+                android.util.Log.w("ChatViewModel", "Local DB insert note: ${e.message}")
             }
+
+            // 3. Network / Firebase Realtime Dispatch
+            val result = repository.sendMessage(
+                chatId = chatId,
+                sender = user,
+                receiverId = contact.id,
+                text = messageText,
+                customMsgId = msgId
+            )
+
+            result.fold(
+                onSuccess = { deliveredMsg ->
+                    // Update local Room database status to "sent"
+                    try {
+                        val sentMsg = deliveredMsg.copy(chatId = chatId, status = "sent")
+                        com.example.ChatApplication.database.chatMessageDao().insertMessage(sentMsg)
+                    } catch (e: Exception) {
+                        android.util.Log.w("ChatViewModel", "Local DB update status note: ${e.message}")
+                    }
+
+                    // Update StateFlow UI
+                    _activeMessages.value = _activeMessages.value.map { msg ->
+                        if (msg.id == msgId) msg.copy(status = "sent") else msg
+                    }
+                },
+                onFailure = { err ->
+                    android.util.Log.e("ChatViewModel", "Network message dispatch failed: ${err.message}", err)
+                    // Mark as failed in local DB
+                    try {
+                        com.example.ChatApplication.database.chatMessageDao().updateMessageStatus(msgId, "failed")
+                    } catch (e: Exception) {
+                        // ignore
+                    }
+                    _activeMessages.value = _activeMessages.value.map { msg ->
+                        if (msg.id == msgId) msg.copy(status = "failed") else msg
+                    }
+                    _errorMessage.value = "Failed to send message: ${err.localizedMessage ?: "Network error"}"
+                }
+            )
         }
     }
 
@@ -727,7 +819,17 @@ class ChatViewModel(
         val contact = _activeContact.value ?: return
         val chatId = repository.getChatId(user.id, contact.id)
 
+        // Optimistically update local active messages StateFlow
+        _activeMessages.value = _activeMessages.value.map { msg ->
+            if (msg.id == messageId) msg.copy(reaction = reaction) else msg
+        }
+
         viewModelScope.launch {
+            try {
+                com.example.ChatApplication.database.chatMessageDao().updateMessageReaction(messageId, reaction)
+            } catch (e: Exception) {
+                // ignore
+            }
             repository.setMessageReaction(chatId, messageId, reaction)
         }
     }

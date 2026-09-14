@@ -1,8 +1,11 @@
 package com.example.model
 
+import androidx.compose.runtime.Immutable
+
 /**
  * Represents an entry in the user's Call History (Missed, Incoming, Outgoing).
  */
+@Immutable
 data class CallRecord(
     val id: String = "",
     val callId: String = "",

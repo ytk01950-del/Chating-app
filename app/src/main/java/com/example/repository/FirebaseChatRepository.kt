@@ -442,8 +442,11 @@ class FirebaseChatRepository {
     // USER PROFILES & PRESENCE
     // -------------------------------------------------------------
 
+    private val userProfileCache = java.util.concurrent.ConcurrentHashMap<String, User>(128)
+
     suspend fun saveUserProfile(user: User) {
         try {
+            userProfileCache[user.id] = user
             database.getReference("users").child(user.id).setValue(user).await()
         } catch (e: Exception) {
             Log.e(tag, "Error saving user profile: ${e.message}", e)
@@ -451,18 +454,28 @@ class FirebaseChatRepository {
         }
     }
 
-    suspend fun fetchUserProfile(userId: String): User? {
+    suspend fun fetchUserProfile(userId: String, forceRefresh: Boolean = false): User? {
+        if (!forceRefresh) {
+            userProfileCache[userId]?.let { return it }
+        }
         return try {
             val snapshot = database.getReference("users").child(userId).get().await()
-            snapshot.getValue(User::class.java)
+            val user = snapshot.getValue(User::class.java)
+            if (user != null) {
+                userProfileCache[userId] = user
+            }
+            user
         } catch (e: Exception) {
             Log.e(tag, "Error fetching user $userId: ${e.message}", e)
-            null
+            userProfileCache[userId]
         }
     }
 
     suspend fun updateUserOnlineStatus(userId: String, isOnline: Boolean) {
         try {
+            userProfileCache[userId]?.let {
+                userProfileCache[userId] = it.copy(isOnline = isOnline, lastSeen = System.currentTimeMillis())
+            }
             val updates = mapOf<String, Any>(
                 "isOnline" to isOnline,
                 "lastSeen" to System.currentTimeMillis()
@@ -530,6 +543,12 @@ class FirebaseChatRepository {
                 }
 
                 val distinctIds = otherUserIds.distinct()
+                val cachedUsers = distinctIds.mapNotNull { userProfileCache[it]?.let { u -> sanitizePublicUser(u) } }
+                if (cachedUsers.size == distinctIds.size) {
+                    val sorted = cachedUsers.sortedByDescending { chatTimestamps[it.id] ?: it.lastSeen }
+                    trySend(sorted)
+                }
+
                 val usersList = mutableListOf<User>()
                 var remaining = distinctIds.size
 
@@ -538,6 +557,7 @@ class FirebaseChatRepository {
                         if (task.isSuccessful) {
                             val user = task.result?.getValue(User::class.java)
                             if (user != null && user.id.isNotBlank()) {
+                                userProfileCache[user.id] = user
                                 synchronized(usersList) {
                                     usersList.add(sanitizePublicUser(user))
                                 }
@@ -574,6 +594,7 @@ class FirebaseChatRepository {
                 for (child in snapshot.children) {
                     val user = child.getValue(User::class.java)
                     if (user != null && user.id.isNotBlank() && user.id != currentUserId) {
+                        userProfileCache[user.id] = user
                         val isRecentlyActive = user.isOnline || (now - user.lastSeen < 2 * 60 * 1000L)
                         if (isRecentlyActive) {
                             onlineList.add(sanitizePublicUser(user.copy(isOnline = true)))
@@ -601,15 +622,19 @@ class FirebaseChatRepository {
             close()
             return@callbackFlow
         }
+        userProfileCache[userId]?.let { trySend(sanitizePublicUser(it)) }
         val userRef = database.getReference("users").child(userId)
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val user = snapshot.getValue(User::class.java)
+                if (user != null) {
+                    userProfileCache[user.id] = user
+                }
                 trySend(user?.let { sanitizePublicUser(it) })
             }
 
             override fun onCancelled(error: DatabaseError) {
-                trySend(null)
+                trySend(userProfileCache[userId]?.let { sanitizePublicUser(it) })
             }
         }
         userRef.addValueEventListener(listener)
@@ -673,6 +698,11 @@ class FirebaseChatRepository {
                     return
                 }
 
+                val cached = followerUids.mapNotNull { userProfileCache[it]?.let { u -> sanitizePublicUser(u) } }
+                if (cached.size == followerUids.size) {
+                    trySend(cached.sortedBy { it.displayName.ifBlank { it.username } })
+                }
+
                 val usersList = mutableListOf<User>()
                 var remaining = followerUids.size
 
@@ -681,6 +711,7 @@ class FirebaseChatRepository {
                         if (task.isSuccessful) {
                             val user = task.result?.getValue(User::class.java)
                             if (user != null && user.id.isNotBlank()) {
+                                userProfileCache[user.id] = user
                                 synchronized(usersList) {
                                     usersList.add(sanitizePublicUser(user))
                                 }
@@ -717,6 +748,11 @@ class FirebaseChatRepository {
                     return
                 }
 
+                val cached = followingUids.mapNotNull { userProfileCache[it]?.let { u -> sanitizePublicUser(u) } }
+                if (cached.size == followingUids.size) {
+                    trySend(cached.sortedBy { it.displayName.ifBlank { it.username } })
+                }
+
                 val usersList = mutableListOf<User>()
                 var remaining = followingUids.size
 
@@ -725,6 +761,7 @@ class FirebaseChatRepository {
                         if (task.isSuccessful) {
                             val user = task.result?.getValue(User::class.java)
                             if (user != null && user.id.isNotBlank()) {
+                                userProfileCache[user.id] = user
                                 synchronized(usersList) {
                                     usersList.add(sanitizePublicUser(user))
                                 }
@@ -857,10 +894,21 @@ class FirebaseChatRepository {
                 for (child in snapshot.children) {
                     val msg = child.getValue(ChatMessage::class.java)
                     if (msg != null) {
-                        messageList.add(msg)
+                        val populatedMsg = if (msg.chatId.isBlank()) msg.copy(chatId = chatId) else msg
+                        messageList.add(populatedMsg)
                     }
                 }
                 messageList.sortBy { it.timestamp }
+
+                // Sync received messages into Room database
+                try {
+                    CoroutineScope(Dispatchers.IO).launch {
+                        com.example.ChatApplication.database.chatMessageDao().insertMessages(messageList)
+                    }
+                } catch (e: Exception) {
+                    Log.w(tag, "Local Room cache sync note: ${e.message}")
+                }
+
                 trySend(messageList)
             }
 
@@ -877,14 +925,16 @@ class FirebaseChatRepository {
         chatId: String,
         sender: User,
         receiverId: String,
-        text: String
+        text: String,
+        customMsgId: String = ""
     ): Result<ChatMessage> {
         return try {
             val messagesRef = database.getReference("chats").child(chatId).child("messages")
-            val msgId = messagesRef.push().key ?: "msg_${System.currentTimeMillis()}"
+            val msgId = if (customMsgId.isNotBlank()) customMsgId else (messagesRef.push().key ?: "msg_${System.currentTimeMillis()}_${(1000..9999).random()}")
 
             val message = ChatMessage(
                 id = msgId,
+                chatId = chatId,
                 senderId = sender.id,
                 senderName = sender.displayName.ifBlank { sender.username },
                 receiverId = receiverId,
@@ -942,6 +992,13 @@ class FirebaseChatRepository {
             )
             database.getReference("notifications").child(receiverId).child(msgId).setValue(notifPayload)
 
+            // Save to local Room DB
+            try {
+                com.example.ChatApplication.database.chatMessageDao().insertMessage(message)
+            } catch (e: Exception) {
+                Log.w(tag, "Local Room DB sync note: ${e.message}")
+            }
+
             // Reset typing status
             setTypingStatus(chatId, sender.id, false)
 
@@ -955,7 +1012,7 @@ class FirebaseChatRepository {
     suspend fun markMessagesAsDelivered(chatId: String, currentUserId: String) {
         try {
             val messagesRef = database.getReference("chats").child(chatId).child("messages")
-            val snapshot = messagesRef.get().await()
+            val snapshot = messagesRef.limitToLast(60).get().await()
             val updates = mutableMapOf<String, Any>()
             val now = System.currentTimeMillis()
             for (child in snapshot.children) {
@@ -978,7 +1035,7 @@ class FirebaseChatRepository {
     suspend fun markMessagesAsRead(chatId: String, currentUserId: String) {
         try {
             val messagesRef = database.getReference("chats").child(chatId).child("messages")
-            val snapshot = messagesRef.get().await()
+            val snapshot = messagesRef.limitToLast(60).get().await()
             val updates = mutableMapOf<String, Any>()
             val now = System.currentTimeMillis()
             for (child in snapshot.children) {
@@ -1588,6 +1645,7 @@ class FirebaseChatRepository {
                     val resolvedLimit = if (viewLimit in 1..2) viewLimit else 1
                     val message = ChatMessage(
                         id = msgId,
+                        chatId = chatId,
                         senderId = sender.id,
                         senderName = sender.displayName.ifBlank { sender.username },
                         receiverId = receiverId,
@@ -1608,6 +1666,13 @@ class FirebaseChatRepository {
 
                     // 1. Write message to Firebase database
                     database.getReference("chats").child(chatId).child("messages").child(msgId).setValue(message).await()
+
+                    // Save to local Room DB
+                    try {
+                        com.example.ChatApplication.database.chatMessageDao().insertMessage(message)
+                    } catch (e: Exception) {
+                        Log.w(tag, "Local Room DB sync note: ${e.message}")
+                    }
 
                     // 2. Write chat index snippet
                     val summaryText = message.getNotificationSummary()

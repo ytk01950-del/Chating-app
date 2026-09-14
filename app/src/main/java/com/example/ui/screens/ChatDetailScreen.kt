@@ -1634,10 +1634,34 @@ fun SophisticatedMessageBubble(
 
                 if (isMe) {
                     Spacer(modifier = Modifier.width(4.dp))
+                    val isSeen = message.isRead || message.status == "seen"
+                    val isDelivered = message.status == "delivered"
+                    val isSending = message.status == "sending"
+                    val isFailed = message.status == "failed"
+
+                    val icon = when {
+                        isSending -> Icons.Default.Schedule
+                        isSeen || isDelivered -> Icons.Default.DoneAll
+                        else -> Icons.Default.Check
+                    }
+                    val tint = when {
+                        isSeen -> AccentBlue
+                        isFailed -> Color(0xFFFF5252)
+                        isSending -> TextSecondary.copy(alpha = 0.5f)
+                        else -> TextSecondary
+                    }
+                    val desc = when {
+                        isSending -> "Sending"
+                        isSeen -> "Seen"
+                        isDelivered -> "Delivered"
+                        isFailed -> "Failed"
+                        else -> "Sent"
+                    }
+
                     Icon(
-                        imageVector = if (message.isRead) Icons.Default.DoneAll else Icons.Default.Check,
-                        contentDescription = if (message.isRead) "Read" else "Sent",
-                        tint = if (message.isRead) AccentBlue else TextSecondary,
+                        imageVector = icon,
+                        contentDescription = desc,
+                        tint = tint,
                         modifier = Modifier.size(14.dp)
                     )
                 }

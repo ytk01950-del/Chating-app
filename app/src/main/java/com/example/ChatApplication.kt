@@ -2,14 +2,46 @@ package com.example
 
 import android.app.Application
 import android.util.Log
+import coil.ImageLoader
+import coil.ImageLoaderFactory
+import coil.disk.DiskCache
+import coil.memory.MemoryCache
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.database.FirebaseDatabase
 
-class ChatApplication : Application() {
+class ChatApplication : Application(), ImageLoaderFactory {
+
+    companion object {
+        lateinit var instance: ChatApplication
+            private set
+
+        val database: com.example.data.local.AppDatabase by lazy {
+            com.example.data.local.AppDatabase.getInstance(instance)
+        }
+    }
+
+    override fun newImageLoader(): ImageLoader {
+        return ImageLoader.Builder(this)
+            .memoryCache {
+                MemoryCache.Builder(this)
+                    .maxSizePercent(0.25)
+                    .build()
+            }
+            .diskCache {
+                DiskCache.Builder()
+                    .directory(cacheDir.resolve("coil_image_cache"))
+                    .maxSizeBytes(64L * 1024 * 1024)
+                    .build()
+            }
+            .crossfade(true)
+            .respectCacheHeaders(false)
+            .build()
+    }
 
     override fun onCreate() {
         super.onCreate()
+        instance = this
         try {
             if (FirebaseApp.getApps(this).isEmpty()) {
                 val options = FirebaseOptions.Builder()

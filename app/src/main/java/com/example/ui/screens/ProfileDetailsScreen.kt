@@ -51,6 +51,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -164,160 +165,147 @@ fun ProfileDetailsScreen(
         "Private"
     }
 
-    Scaffold(
-        topBar = {
-            // ==================================================
-            // TOP HEADER
-            // ==================================================
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(colors.background)
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Left side: Back arrow inside a rounded square button (if back action available)
-                if (onBack != null) {
-                    Surface(
-                        onClick = onBack,
-                        modifier = Modifier
-                            .size(42.dp)
-                            .pressScale()
-                            .testTag("profile_back_button"),
-                        shape = RoundedCornerShape(12.dp),
-                        color = colors.cardBackground,
-                        border = BorderStroke(1.dp, colors.border)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back",
-                                tint = colors.textPrimary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
-                } else {
-                    Spacer(modifier = Modifier.size(42.dp))
-                }
-
-                Text(
-                    text = if (profileUser.username.isNotBlank()) "@${profileUser.username}" else "Profile",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
-                    ),
-                    color = colors.textPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                // Right side: Three-dot menu inside a rounded square button
-                Box {
-                    Surface(
-                        onClick = { showMenu = true },
-                        modifier = Modifier
-                            .size(42.dp)
-                            .pressScale()
-                            .testTag("profile_more_button"),
-                        shape = RoundedCornerShape(12.dp),
-                        color = colors.cardBackground,
-                        border = BorderStroke(1.dp, colors.border)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Default.MoreVert,
-                                contentDescription = "More Options",
-                                tint = colors.textPrimary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
-
-                    DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { showMenu = false },
-                        modifier = Modifier
-                            .background(colors.surfaceElevated)
-                            .border(1.dp, colors.border, RoundedCornerShape(12.dp))
-                    ) {
-                        if (isSelf) {
-                            DropdownMenuItem(
-                                text = { Text("Edit Profile", color = colors.textPrimary) },
-                                leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null, tint = colors.textPrimary) },
-                                onClick = {
-                                    showMenu = false
-                                    showEditProfileDialog = true
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Settings", color = colors.textPrimary) },
-                                leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null, tint = colors.textPrimary) },
-                                onClick = {
-                                    showMenu = false
-                                    onOpenSettings?.invoke()
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Share Profile", color = colors.textPrimary) },
-                                leadingIcon = { Icon(Icons.Default.Share, contentDescription = null, tint = colors.textPrimary) },
-                                onClick = {
-                                    showMenu = false
-                                    Toast.makeText(context, "Sharing @${profileUser.username}'s profile", Toast.LENGTH_SHORT).show()
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Copy Profile Link", color = colors.textPrimary) },
-                                leadingIcon = { Icon(Icons.Default.Public, contentDescription = null, tint = colors.textPrimary) },
-                                onClick = {
-                                    showMenu = false
-                                    clipboardManager.setText(AnnotatedString("https://wpchat.app/@${profileUser.username}"))
-                                    Toast.makeText(context, "Profile link copied to clipboard!", Toast.LENGTH_SHORT).show()
-                                }
-                            )
-                        } else {
-                            DropdownMenuItem(
-                                text = { Text("Share Profile", color = colors.textPrimary) },
-                                leadingIcon = { Icon(Icons.Default.Share, contentDescription = null, tint = colors.textPrimary) },
-                                onClick = {
-                                    showMenu = false
-                                    Toast.makeText(context, "Sharing @${profileUser.username}'s profile", Toast.LENGTH_SHORT).show()
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Copy Profile Link", color = colors.textPrimary) },
-                                leadingIcon = { Icon(Icons.Default.Public, contentDescription = null, tint = colors.textPrimary) },
-                                onClick = {
-                                    showMenu = false
-                                    clipboardManager.setText(AnnotatedString("https://wpchat.app/@${profileUser.username}"))
-                                    Toast.makeText(context, "Profile link copied to clipboard!", Toast.LENGTH_SHORT).show()
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Report User", color = Color(0xFFEF4444)) },
-                                leadingIcon = { Icon(Icons.Default.Info, contentDescription = null, tint = Color(0xFFEF4444)) },
-                                onClick = {
-                                    showMenu = false
-                                    Toast.makeText(context, "Report submitted for @${profileUser.username}", Toast.LENGTH_SHORT).show()
-                                }
-                            )
-                        }
-                    }
-                }
-            }
-        },
-        containerColor = colors.background,
-        modifier = modifier.fillMaxSize()
-    ) { innerPadding ->
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(colors.background)
+    ) {
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
                 .testTag("profile_details_list"),
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // ==================================================
+            // 1. TOP HEADER (Integrated Scrollable Header)
+            // ==================================================
+            item(key = "profile_top_header") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp, bottom = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Left side: Back arrow button (if back action available)
+                    if (onBack != null) {
+                        IconButton(
+                            onClick = onBack,
+                            modifier = Modifier
+                                .size(40.dp)
+                                .testTag("profile_back_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                                tint = colors.textPrimary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.size(40.dp))
+                    }
+
+                    Text(
+                        text = if (profileUser.username.isNotBlank()) "@${profileUser.username}" else "Profile",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 17.sp
+                        ),
+                        color = colors.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    // Right side: Three-dot menu button
+                    Box {
+                        IconButton(
+                            onClick = { showMenu = true },
+                            modifier = Modifier
+                                .size(40.dp)
+                                .testTag("profile_more_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MoreVert,
+                                contentDescription = "More Options",
+                                tint = colors.textPrimary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false },
+                            modifier = Modifier
+                                .background(colors.surfaceElevated)
+                                .border(1.dp, colors.border, RoundedCornerShape(12.dp))
+                        ) {
+                            if (isSelf) {
+                                DropdownMenuItem(
+                                    text = { Text("Edit Profile", color = colors.textPrimary) },
+                                    leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null, tint = colors.textPrimary) },
+                                    onClick = {
+                                        showMenu = false
+                                        showEditProfileDialog = true
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Settings", color = colors.textPrimary) },
+                                    leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null, tint = colors.textPrimary) },
+                                    onClick = {
+                                        showMenu = false
+                                        onOpenSettings?.invoke()
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Share Profile", color = colors.textPrimary) },
+                                    leadingIcon = { Icon(Icons.Default.Share, contentDescription = null, tint = colors.textPrimary) },
+                                    onClick = {
+                                        showMenu = false
+                                        Toast.makeText(context, "Sharing @${profileUser.username}'s profile", Toast.LENGTH_SHORT).show()
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Copy Profile Link", color = colors.textPrimary) },
+                                    leadingIcon = { Icon(Icons.Default.Public, contentDescription = null, tint = colors.textPrimary) },
+                                    onClick = {
+                                        showMenu = false
+                                        clipboardManager.setText(AnnotatedString("https://wpchat.app/@${profileUser.username}"))
+                                        Toast.makeText(context, "Profile link copied to clipboard!", Toast.LENGTH_SHORT).show()
+                                    }
+                                )
+                            } else {
+                                DropdownMenuItem(
+                                    text = { Text("Share Profile", color = colors.textPrimary) },
+                                    leadingIcon = { Icon(Icons.Default.Share, contentDescription = null, tint = colors.textPrimary) },
+                                    onClick = {
+                                        showMenu = false
+                                        Toast.makeText(context, "Sharing @${profileUser.username}'s profile", Toast.LENGTH_SHORT).show()
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Copy Profile Link", color = colors.textPrimary) },
+                                    leadingIcon = { Icon(Icons.Default.Public, contentDescription = null, tint = colors.textPrimary) },
+                                    onClick = {
+                                        showMenu = false
+                                        clipboardManager.setText(AnnotatedString("https://wpchat.app/@${profileUser.username}"))
+                                        Toast.makeText(context, "Profile link copied to clipboard!", Toast.LENGTH_SHORT).show()
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Report User", color = Color(0xFFEF4444)) },
+                                    leadingIcon = { Icon(Icons.Default.Info, contentDescription = null, tint = Color(0xFFEF4444)) },
+                                    onClick = {
+                                        showMenu = false
+                                        Toast.makeText(context, "Report submitted for @${profileUser.username}", Toast.LENGTH_SHORT).show()
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
             // ==================================================
             // MAIN PROFILE CARD
             // ==================================================

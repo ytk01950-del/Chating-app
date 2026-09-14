@@ -64,9 +64,7 @@ import com.example.ui.components.AppFilterChip
 import com.example.ui.components.UserAvatar
 import com.example.ui.theme.AppTheme
 import com.example.ui.theme.OnlineGreen
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import com.example.util.DateTimeUtils
 
 @Composable
 fun CallsTab(
@@ -94,176 +92,196 @@ fun CallsTab(
             .fillMaxSize()
             .background(colors.background)
     ) {
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 4.dp)
+                .testTag("calls_history_list"),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 90.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Header Action & Filter Chips Row
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AppFilterChip(
-                        selected = !showMissedOnly,
-                        onClick = { showMissedOnly = false },
-                        label = "All",
-                        badgeCount = callHistory.size,
-                        modifier = Modifier.testTag("filter_all_calls")
-                    )
-
-                    val missedCount = callHistory.count { it.isMissed() }
-                    AppFilterChip(
-                        selected = showMissedOnly,
-                        onClick = { showMissedOnly = true },
-                        label = "Missed",
-                        badgeCount = missedCount,
-                        modifier = Modifier.testTag("filter_missed_calls")
-                    )
-                }
-
-                // New Call Button
-                Surface(
-                    shape = RoundedCornerShape(18.dp),
-                    color = if (colors.isDark) Color(0xFF262626) else Color(0xFFEFEFEF),
-                    border = BorderStroke(1.dp, if (colors.isDark) Color(0xFF363636) else Color(0xFFDBDBDB)),
+            // 1. Natural Collapsing Screen Header (Title + "+ New Call" + Filter Chips)
+            item(key = "calls_screen_header") {
+                Column(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(18.dp))
-                        .clickable { showNewCallDialog = true }
-                        .testTag("btn_new_call_header")
+                        .fillMaxWidth()
+                        .padding(top = 16.dp, bottom = 8.dp)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Call,
-                            contentDescription = "New Call",
-                            tint = if (colors.isDark) Color.White else Color(0xFF111111),
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "+ New Call",
-                            color = if (colors.isDark) Color.White else Color(0xFF111111),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
+                            text = "Calls",
+                            style = MaterialTheme.typography.headlineMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 28.sp,
+                                letterSpacing = (-0.5).sp
+                            ),
+                            color = colors.textPrimary,
+                            modifier = Modifier.testTag("calls_screen_title")
+                        )
+
+                        // New Call Button (Clean, seamless pill without harsh clipping borders)
+                        Surface(
+                            shape = RoundedCornerShape(20.dp),
+                            color = if (colors.isDark) Color(0xFF262626) else Color(0xFFEFEFEF),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(20.dp))
+                                .clickable { showNewCallDialog = true }
+                                .testTag("btn_new_call_header")
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Call,
+                                    contentDescription = "New Call",
+                                    tint = if (colors.isDark) Color.White else Color(0xFF111111),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "+ New Call",
+                                    color = if (colors.isDark) Color.White else Color(0xFF111111),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Filter Chips Row
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        AppFilterChip(
+                            selected = !showMissedOnly,
+                            onClick = { showMissedOnly = false },
+                            label = "All",
+                            badgeCount = callHistory.size,
+                            modifier = Modifier.testTag("filter_all_calls")
+                        )
+
+                        val missedCount = remember(callHistory) { callHistory.count { it.isMissed() } }
+                        AppFilterChip(
+                            selected = showMissedOnly,
+                            onClick = { showMissedOnly = true },
+                            label = "Missed",
+                            badgeCount = missedCount,
+                            modifier = Modifier.testTag("filter_missed_calls")
                         )
                     }
                 }
             }
 
             if (filteredCalls.isEmpty()) {
-                // Empty State
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 32.dp, vertical = 40.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
+                // Empty State Item
+                item(key = "calls_empty_state") {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 40.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(72.dp)
-                                .clip(CircleShape)
-                                .background(colors.surfaceVariant)
-                                .border(1.dp, colors.borderSubtle, CircleShape),
-                            contentAlignment = Alignment.Center
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
                         ) {
-                            Icon(
-                                imageVector = if (showMissedOnly) Icons.Default.CallMissed else Icons.Default.PhoneCallback,
-                                contentDescription = null,
-                                tint = if (showMissedOnly) Color(0xFFEF4444) else colors.accentOrange,
-                                modifier = Modifier.size(36.dp)
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        Text(
-                            text = if (showMissedOnly) "No Missed Calls" else "No Recent Calls",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = colors.textPrimary
-                        )
-
-                        Spacer(modifier = Modifier.height(6.dp))
-
-                        Text(
-                            text = if (showMissedOnly) {
-                                "You don't have any missed calls."
-                            } else {
-                                "Tap 'New Call' or select any contact to start 1-on-1 HD voice or video calling."
-                            },
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = colors.textMuted,
-                            textAlign = TextAlign.Center,
-                            lineHeight = 20.sp
-                        )
-
-                        if (!showMissedOnly && availableUsers.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(20.dp))
-                            Surface(
-                                shape = RoundedCornerShape(22.dp),
-                                color = if (colors.isDark) Color.White else Color(0xFF111111),
+                            Box(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(22.dp))
-                                    .clickable { showNewCallDialog = true }
-                                    .testTag("btn_empty_new_call")
+                                    .size(72.dp)
+                                    .clip(CircleShape)
+                                    .background(colors.surfaceVariant)
+                                    .border(1.dp, colors.borderSubtle, CircleShape),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                                Icon(
+                                    imageVector = if (showMissedOnly) Icons.Default.CallMissed else Icons.Default.PhoneCallback,
+                                    contentDescription = null,
+                                    tint = if (showMissedOnly) Color(0xFFEF4444) else colors.accentOrange,
+                                    modifier = Modifier.size(36.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            Text(
+                                text = if (showMissedOnly) "No Missed Calls" else "No Recent Calls",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = colors.textPrimary
+                            )
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            Text(
+                                text = if (showMissedOnly) {
+                                    "You don't have any missed calls."
+                                } else {
+                                    "Tap 'New Call' or select any contact to start 1-on-1 HD voice or video calling."
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = colors.textMuted,
+                                textAlign = TextAlign.Center,
+                                lineHeight = 20.sp
+                            )
+
+                            if (!showMissedOnly && availableUsers.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(20.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(22.dp),
+                                    color = if (colors.isDark) Color.White else Color(0xFF111111),
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(22.dp))
+                                        .clickable { showNewCallDialog = true }
+                                        .testTag("btn_empty_new_call")
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Call,
-                                        contentDescription = null,
-                                        tint = if (colors.isDark) Color.Black else Color.White,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "Start a Call",
-                                        color = if (colors.isDark) Color.Black else Color.White,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 14.sp
-                                    )
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Call,
+                                            contentDescription = null,
+                                            tint = if (colors.isDark) Color.Black else Color.White,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "Start a Call",
+                                            color = if (colors.isDark) Color.Black else Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
                 }
             } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .testTag("calls_history_list"),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 90.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(filteredCalls, key = { it.id.ifBlank { "${it.callId}_${it.timestamp}" } }) { callRecord ->
-                        val otherUser = User(
+                items(filteredCalls, key = { it.id.ifBlank { "${it.callId}_${it.timestamp}" } }) { callRecord ->
+                    val otherUser = remember(callRecord.otherUserId, callRecord.otherUserName, callRecord.otherUserUsername, callRecord.otherUserPhotoUrl, callRecord.otherUserAvatarId) {
+                        User(
                             id = callRecord.otherUserId,
                             displayName = callRecord.otherUserName.ifBlank { "User" },
                             username = callRecord.otherUserUsername,
                             photoUrl = callRecord.otherUserPhotoUrl,
                             avatarId = callRecord.otherUserAvatarId
                         )
-
-                        CallHistoryItemCard(
-                            record = callRecord,
-                            onVoiceCall = { onStartVoiceCall(otherUser) },
-                            onVideoCall = { onStartVideoCall(otherUser) },
-                            onOpenProfile = { onOpenUserProfile(otherUser) }
-                        )
                     }
+
+                    CallHistoryItemCard(
+                        record = callRecord,
+                        onVoiceCall = { onStartVoiceCall(otherUser) },
+                        onVideoCall = { onStartVideoCall(otherUser) },
+                        onOpenProfile = { onOpenUserProfile(otherUser) }
+                    )
                 }
             }
         }
@@ -532,15 +550,21 @@ fun CallHistoryItemCard(
                         )
 
                         // Formatted Date / Time
+                        val formattedTime = remember(record.timestamp) {
+                            DateTimeUtils.formatCallTime(record.timestamp)
+                        }
                         Text(
-                            text = formatCallTimestamp(record.timestamp),
+                            text = formattedTime,
                             style = MaterialTheme.typography.labelSmall,
                             color = colors.textMuted
                         )
 
                         if (record.durationSeconds > 0) {
+                            val formattedDuration = remember(record.durationSeconds, record.direction, record.status) {
+                                record.getFormattedDuration()
+                            }
                             Text(
-                                text = "• ${record.getFormattedDuration()}",
+                                text = "• $formattedDuration",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = colors.textSecondary,
                                 fontWeight = FontWeight.Medium
@@ -586,20 +610,5 @@ fun CallHistoryItemCard(
                 }
             }
         }
-    }
-}
-
-private fun formatCallTimestamp(timestamp: Long): String {
-    if (timestamp <= 0) return "Recent"
-    val diff = System.currentTimeMillis() - timestamp
-    val oneDay = 24 * 60 * 60 * 1000L
-    val timeFormat = SimpleDateFormat("h:mm a", Locale.getDefault())
-    val dateFormat = SimpleDateFormat("MMM d, h:mm a", Locale.getDefault())
-
-    return when {
-        diff < 60 * 1000L -> "Just now"
-        diff < oneDay -> "Today, ${timeFormat.format(Date(timestamp))}"
-        diff < 2 * oneDay -> "Yesterday, ${timeFormat.format(Date(timestamp))}"
-        else -> dateFormat.format(Date(timestamp))
     }
 }

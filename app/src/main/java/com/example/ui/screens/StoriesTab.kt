@@ -36,6 +36,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -62,9 +63,7 @@ import com.example.ui.components.AppIconButton
 import com.example.ui.components.StoryAvatarRing
 import com.example.ui.components.UserAvatar
 import com.example.ui.theme.AppTheme
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import com.example.util.DateTimeUtils
 
 @Composable
 fun StoriesTab(
@@ -89,11 +88,47 @@ fun StoriesTab(
             modifier = Modifier
                 .fillMaxSize()
                 .testTag("stories_tab_list"),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 90.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 90.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // 1. Natural Collapsing Screen Header
+            item(key = "stories_screen_header") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp, bottom = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Stories",
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 28.sp,
+                            letterSpacing = (-0.5).sp
+                        ),
+                        color = colors.textPrimary,
+                        modifier = Modifier.testTag("stories_screen_title")
+                    )
+
+                    IconButton(
+                        onClick = onOpenAddStory,
+                        modifier = Modifier
+                            .size(42.dp)
+                            .testTag("stories_camera_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CameraAlt,
+                            contentDescription = "Create Story",
+                            tint = colors.textPrimary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
+            }
+
             // My Status Section
-            item {
+            item(key = "my_status_section") {
                 Text(
                     text = "My Status",
                     style = MaterialTheme.typography.titleMedium,
@@ -316,7 +351,7 @@ fun StoriesTab(
             } else {
                 items(otherStoriesWithActive, key = { it.user.id }) { group ->
                     val latestStory = group.stories.maxByOrNull { it.createdAt }
-                    val formattedTime = latestStory?.let { formatStoryTimestamp(it.createdAt) } ?: "Recent"
+                    val formattedTime = latestStory?.let { DateTimeUtils.formatStoryTimestamp(it.createdAt) } ?: "Recent"
 
                     Card(
                         modifier = Modifier
@@ -402,16 +437,5 @@ fun StoriesTab(
                 }
             }
         }
-    }
-}
-
-private fun formatStoryTimestamp(timestamp: Long): String {
-    if (timestamp <= 0) return "Just now"
-    val diff = System.currentTimeMillis() - timestamp
-    return when {
-        diff < 60_000 -> "Just now"
-        diff < 3600_000 -> "${diff / 60_000}m ago"
-        diff < 86400_000 -> "${diff / 3600_000}h ago"
-        else -> SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(timestamp))
     }
 }
