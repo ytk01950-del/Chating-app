@@ -148,6 +148,15 @@ class ChatViewModel(
     val uploadingFileName: StateFlow<String> = _uploadingFileName.asStateFlow()
 
     // -------------------------------------------------------------
+    // LEADERBOARD & ACTIVE USAGE TIME TRACKING STATE
+    // -------------------------------------------------------------
+    private val _leaderboardUsers = MutableStateFlow<List<User>>(emptyList())
+    val leaderboardUsers: StateFlow<List<User>> = _leaderboardUsers.asStateFlow()
+
+    private val _isLeaderboardLoading = MutableStateFlow(false)
+    val isLeaderboardLoading: StateFlow<Boolean> = _isLeaderboardLoading.asStateFlow()
+
+    // -------------------------------------------------------------
     // WEBRTC / 1-ON-1 AUDIO & VIDEO CALLING STATE
     // -------------------------------------------------------------
     private val _incomingCall = MutableStateFlow<CallSession?>(null)
@@ -192,6 +201,10 @@ class ChatViewModel(
     private var followersJob: Job? = null
     private var followingJob: Job? = null
     private var profileUserJob: Job? = null
+    private var leaderboardJob: Job? = null
+    private var activeTimeTrackerJob: Job? = null
+    private var lastActiveTimeFlush: Long = 0L
+    private var isAppInForeground: Boolean = false
 
     // Grouped active stories for the Instagram/Snapchat style story tray
     val groupedStories: StateFlow<List<UserStoryGroup>> = combine(_activeStories, _allUsers, _currentUser) { stories, users, current ->
@@ -553,6 +566,21 @@ class ChatViewModel(
             repository.observeFollowingUserIds(currentUserId).collect { ids ->
                 _followedUserIds.value = ids
             }
+        }
+
+        // Real-time Top 100 Leaderboard observer
+        leaderboardJob?.cancel()
+        leaderboardJob = viewModelScope.launch {
+            _isLeaderboardLoading.value = true
+            repository.observeLeaderboard().collect { list ->
+                _leaderboardUsers.value = list
+                _isLeaderboardLoading.value = false
+            }
+        }
+
+        // Start tracking active usage time if in foreground
+        if (isAppInForeground) {
+            startActiveSession()
         }
 
         // Setup real-time incoming notification dispatch
@@ -1570,5 +1598,97 @@ class ChatViewModel(
 
     fun clearInfo() {
         _infoMessage.value = null
+    }
+
+    // -------------------------------------------------------------
+    // ACTIVE USAGE TIME TRACKER & LEADERBOARD LIFECYCLE
+    // -------------------------------------------------------------
+
+    fun onAppForegrounded() {
+        isAppInForeground = true
+        startActiveSession()
+    }
+
+    fun onAppBackgrounded() {
+        isAppInForeground = false
+        pauseActiveSession()
+    }
+
+    fun startActiveSession() {
+        val user = _currentUser.value ?: return
+        val now = System.currentTimeMillis()
+        lastActiveTimeFlush = now
+
+        activeTimeTrackerJob?.cancel()
+        activeTimeTrackerJob = viewModelScope.launch {
+            while (true) {
+                delay(30_000L) // Efficient 30-second interval batch flush
+                flushActiveTime()
+            }
+        }
+    }
+
+    fun pauseActiveSession() {
+        activeTimeTrackerJob?.cancel()
+        activeTimeTrackerJob = null
+        flushActiveTime()
+        lastActiveTimeFlush = 0L
+    }
+
+    fun flushActiveTime() {
+        val user = _currentUser.value ?: return
+        if (lastActiveTimeFlush <= 0L) return
+        val now = System.currentTimeMillis()
+        val elapsed = now - lastActiveTimeFlush
+        if (elapsed >= 1000L) {
+            lastActiveTimeFlush = now
+            val updatedActiveTime = user.effectiveActiveTimeMs + elapsed
+            val updatedUser = user.copy(
+                totalActiveTimeMs = updatedActiveTime,
+                activeTimeMs = updatedActiveTime,
+                lastSeen = now
+            )
+            _currentUser.value = updatedUser
+
+            viewModelScope.launch {
+                repository.incrementActiveTime(user.id, elapsed)
+            }
+        }
+    }
+
+    fun refreshLeaderboard() {
+        val currentUserId = _currentUser.value?.id.orEmpty()
+        leaderboardJob?.cancel()
+        leaderboardJob = viewModelScope.launch {
+            _isLeaderboardLoading.value = true
+            repository.observeLeaderboard().collect { list ->
+                _leaderboardUsers.value = list
+                _isLeaderboardLoading.value = false
+            }
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        pauseActiveSession()
+        leaderboardJob?.cancel()
+        activeTimeTrackerJob?.cancel()
+        messagesJob?.cancel()
+        typingJob?.cancel()
+        usersJob?.cancel()
+        onlineUsersJob?.cancel()
+        activeStoriesJob?.cancel()
+        feedPostsJob?.cancel()
+        messageRequestsJob?.cancel()
+        blockedUsersJob?.cancel()
+        profileStoriesJob?.cancel()
+        profileUserJob?.cancel()
+        incomingCallJob?.cancel()
+        activeCallJob?.cancel()
+        callHistoryJob?.cancel()
+        callTimerJob?.cancel()
+        followedUserIdsJob?.cancel()
+        followersJob?.cancel()
+        followingJob?.cancel()
     }
 }

@@ -16,6 +16,8 @@ data class User(
     val isOnline: Boolean = false,
     val lastSeen: Long = System.currentTimeMillis(),
     val createdAt: Long = System.currentTimeMillis(),
+    val totalActiveTimeMs: Long = 0L,
+    val activeTimeMs: Long = 0L,
     val storiesCount: Int = 0,
     val postsCount: Int = 0,
     val website: String = "",
@@ -28,6 +30,9 @@ data class User(
     val showFollowingList: Boolean = true,
     val showDateOfBirth: String = "Everyone" // "Everyone", "Followers", "Only Me"
 ) {
+    val effectiveActiveTimeMs: Long
+        get() = maxOf(totalActiveTimeMs, activeTimeMs)
+
     fun getInitials(): String {
         val names = displayName.trim().split(" ").filter { it.isNotBlank() }
         return when {

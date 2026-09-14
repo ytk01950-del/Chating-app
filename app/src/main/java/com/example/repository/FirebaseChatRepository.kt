@@ -486,6 +486,60 @@ class FirebaseChatRepository {
         }
     }
 
+    // -------------------------------------------------------------
+    // ACTIVE TIME TRACKING & LEADERBOARD
+    // -------------------------------------------------------------
+
+    suspend fun incrementActiveTime(userId: String, elapsedMs: Long) {
+        if (userId.isBlank() || elapsedMs <= 0L || elapsedMs > 15 * 60 * 1000L) return
+        try {
+            val userRef = database.getReference("users").child(userId)
+            val updates = mapOf<String, Any>(
+                "totalActiveTimeMs" to com.google.firebase.database.ServerValue.increment(elapsedMs),
+                "activeTimeMs" to com.google.firebase.database.ServerValue.increment(elapsedMs),
+                "lastSeen" to System.currentTimeMillis()
+            )
+            userRef.updateChildren(updates).await()
+
+            userProfileCache[userId]?.let { cached ->
+                val updatedTime = cached.effectiveActiveTimeMs + elapsedMs
+                userProfileCache[userId] = cached.copy(
+                    totalActiveTimeMs = updatedTime,
+                    activeTimeMs = updatedTime,
+                    lastSeen = System.currentTimeMillis()
+                )
+            }
+        } catch (e: Exception) {
+            Log.w(tag, "Error incrementing active time for $userId: ${e.message}")
+        }
+    }
+
+    fun observeLeaderboard(): Flow<List<User>> = callbackFlow {
+        val usersRef = database.getReference("users")
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val userList = mutableListOf<User>()
+                for (child in snapshot.children) {
+                    val user = child.getValue(User::class.java)
+                    if (user != null && user.id.isNotBlank()) {
+                        userProfileCache[user.id] = user
+                        userList.add(sanitizePublicUser(user))
+                    }
+                }
+                // Rank from highest active usage time to lowest, top 100
+                val top100 = userList.sortedByDescending { it.effectiveActiveTimeMs }.take(100)
+                trySend(top100)
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                Log.w(tag, "Leaderboard query cancelled: ${error.message}")
+                trySend(emptyList())
+            }
+        }
+        usersRef.addValueEventListener(listener)
+        awaitClose { usersRef.removeEventListener(listener) }
+    }
+
     fun setupPresence(userId: String) {
         try {
             val connectedRef = database.getReference(".info/connected")

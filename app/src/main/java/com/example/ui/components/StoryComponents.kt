@@ -113,14 +113,14 @@ fun StoryTray(
 ) {
     val colors = AppTheme.colors
 
-    Surface(
-        color = colors.surface,
-        modifier = modifier.fillMaxWidth(),
-        border = BorderStroke(1.dp, colors.borderSubtle)
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(Color.Black)
     ) {
         LazyRow(
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -154,20 +154,20 @@ fun StoryTray(
                             )
                         }
 
-                        // Add (+) badge if no active story or as an affordance
+                        // Add (+) badge
                         Box(
                             modifier = Modifier
                                 .size(20.dp)
                                 .clip(CircleShape)
-                                .background(colors.accentOrange)
-                                .border(2.dp, colors.surface, CircleShape)
+                                .background(Color.White)
+                                .border(2.dp, Color.Black, CircleShape)
                                 .clickable { onOpenAddStory() },
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Add,
                                 contentDescription = "Add Story",
-                                tint = Color.White,
+                                tint = Color.Black,
                                 modifier = Modifier.size(14.dp)
                             )
                         }
@@ -177,7 +177,7 @@ fun StoryTray(
 
                     Text(
                         text = if (hasMyStories) "Your Story" else "Add Story",
-                        color = if (colors.isDark) Color.White else colors.textPrimary,
+                        color = Color.White,
                         fontSize = 11.sp,
                         fontWeight = if (hasMyStories) FontWeight.Bold else FontWeight.Medium,
                         maxLines = 1,
@@ -216,7 +216,7 @@ fun StoryTray(
 
                     Text(
                         text = group.user.displayName.substringBefore(" "),
-                        color = if (colors.isDark) Color.White else colors.textPrimary,
+                        color = Color.White,
                         fontSize = 11.sp,
                         fontWeight = if (group.hasUnseenStories) FontWeight.Bold else FontWeight.SemiBold,
                         maxLines = 1,

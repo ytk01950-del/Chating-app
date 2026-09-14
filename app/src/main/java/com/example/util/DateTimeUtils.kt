@@ -90,4 +90,22 @@ object DateTimeUtils {
             }
         }
     }
+
+    fun formatActiveUsageTime(timeMs: Long): String {
+        if (timeMs <= 0L) return "0m"
+        val totalSecs = timeMs / 1000L
+        if (totalSecs < 60L) return "${totalSecs}s"
+
+        val totalMins = totalSecs / 60L
+        val hours = totalMins / 60L
+        val mins = totalMins % 60L
+        val days = hours / 24L
+        val remHours = hours % 24L
+
+        return when {
+            days > 0L -> if (remHours > 0L) "${days}d ${remHours}h" else "${days}d"
+            hours > 0L -> if (mins > 0L) "${hours}h ${mins}m" else "${hours}h"
+            else -> "${mins}m"
+        }
+    }
 }

@@ -109,6 +109,9 @@ fun UserDirectoryScreen(
     onUploadProfilePhoto: (Uri) -> Unit = {},
     onUpdateProfile: (String, String, String, Int, String) -> Unit = { _, _, _, _, _ -> },
     onUpdateProfileExtended: (String, String, String, Int, String, String, String) -> Unit = { _, _, _, _, _, _, _ -> },
+    leaderboardUsers: List<User> = emptyList(),
+    isLeaderboardLoading: Boolean = false,
+    onRefreshLeaderboard: () -> Unit = {},
     onClaimUsername: (String, (Boolean) -> Unit) -> Unit = { _, _ -> },
     onCheckUsernameAvailable: suspend (String) -> Boolean = { true },
     onOpenSettings: () -> Unit = {},
@@ -141,7 +144,7 @@ fun UserDirectoryScreen(
         modifier = Modifier
             .fillMaxSize()
             .imePadding(),
-        containerColor = colors.background,
+        containerColor = Color.Black,
         bottomBar = {
             FloatingBottomNavBar(
                 selectedTab = selectedTab,
@@ -155,7 +158,7 @@ fun UserDirectoryScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(colors.background)
+                .background(Color.Black)
         ) {
             AnimatedContent(
                 targetState = selectedTab,
@@ -202,6 +205,17 @@ fun UserDirectoryScreen(
                             availableUsers = users,
                             onStartVoiceCall = onStartVoiceCall,
                             onStartVideoCall = onStartVideoCall,
+                            onOpenUserProfile = onOpenOtherUserProfile
+                        )
+                    }
+
+                    NavigationTab.LEADERBOARD -> {
+                        LeaderboardScreen(
+                            currentUser = currentUser,
+                            leaderboardUsers = leaderboardUsers,
+                            isLoading = isLeaderboardLoading,
+                            onRefresh = onRefreshLeaderboard,
+                            onSelectUser = onSelectUser,
                             onOpenUserProfile = onOpenOtherUserProfile
                         )
                     }
@@ -273,6 +287,7 @@ private fun ChatsTabView(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
+            .background(Color.Black)
             .testTag("chats_directory_list"),
         contentPadding = PaddingValues(bottom = 90.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)

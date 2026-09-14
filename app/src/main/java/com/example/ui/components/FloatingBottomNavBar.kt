@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
@@ -42,6 +43,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.AppTheme
@@ -49,6 +51,7 @@ import com.example.ui.theme.AppTheme
 enum class NavigationTab(val title: String, val icon: ImageVector, val tag: String) {
     CHATS("Chats", Icons.AutoMirrored.Filled.Chat, "nav_tab_chats"),
     CALLS("Calls", Icons.Default.Call, "nav_tab_calls"),
+    LEADERBOARD("Leaderboard", Icons.Default.EmojiEvents, "nav_tab_leaderboard"),
     STORIES("Stories", Icons.Default.AutoAwesome, "nav_tab_stories"),
     PROFILE("Profile", Icons.Default.Person, "nav_tab_profile");
 
@@ -211,6 +214,7 @@ fun FloatingBottomNavBar(
                                             }
                                         }
                                     }
+                                    NavigationTab.LEADERBOARD -> {}
                                     NavigationTab.STORIES -> {
                                         if (hasNewStories) {
                                             Box(
@@ -231,8 +235,11 @@ fun FloatingBottomNavBar(
                             Text(
                                 text = tab.title,
                                 color = animatedContentColor,
-                                fontSize = 11.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                fontSize = if (tab == NavigationTab.LEADERBOARD) 9.sp else 10.sp,
+                                letterSpacing = if (tab == NavigationTab.LEADERBOARD) (-0.4).sp else 0.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }

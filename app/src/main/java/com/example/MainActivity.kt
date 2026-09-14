@@ -195,6 +195,31 @@ fun WpChatApp(
     val followersList by viewModel.followersList.collectAsStateWithLifecycle()
     val followingList by viewModel.followingList.collectAsStateWithLifecycle()
     val isSettingsOpen by viewModel.isSettingsOpen.collectAsStateWithLifecycle()
+    val leaderboardUsers by viewModel.leaderboardUsers.collectAsStateWithLifecycle()
+    val isLeaderboardLoading by viewModel.isLeaderboardLoading.collectAsStateWithLifecycle()
+
+    // Real-time Active App Usage Tracker (tracks only while app is in foreground)
+    val activeTrackingLifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(activeTrackingLifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            when (event) {
+                androidx.lifecycle.Lifecycle.Event.ON_START,
+                androidx.lifecycle.Lifecycle.Event.ON_RESUME -> {
+                    viewModel.onAppForegrounded()
+                }
+                androidx.lifecycle.Lifecycle.Event.ON_PAUSE,
+                androidx.lifecycle.Lifecycle.Event.ON_STOP -> {
+                    viewModel.onAppBackgrounded()
+                }
+                else -> {}
+            }
+        }
+        activeTrackingLifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            activeTrackingLifecycleOwner.lifecycle.removeObserver(observer)
+            viewModel.onAppBackgrounded()
+        }
+    }
 
     var pendingCallTarget by remember { mutableStateOf<User?>(null) }
     var pendingCallIsVideo by remember { mutableStateOf(false) }
@@ -576,6 +601,9 @@ fun WpChatApp(
                                 onUpdateProfileExtended = { name, bio, status, avatarId, gender, website, dob ->
                                     viewModel.updateProfileDetails(name, bio, status, avatarId, gender, website, dob)
                                 },
+                                leaderboardUsers = leaderboardUsers,
+                                isLeaderboardLoading = isLeaderboardLoading,
+                                onRefreshLeaderboard = { viewModel.refreshLeaderboard() },
                                 onClaimUsername = { username, callback ->
                                     viewModel.claimUsernameForCurrentUser(username, callback)
                                 },
