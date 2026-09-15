@@ -56,7 +56,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.model.User
 import com.example.ui.components.CallAndNotificationPermissionsDialog
-import com.example.ui.components.NexaSplashScreen
 import com.example.ui.screens.ActiveCallScreen
 import com.example.ui.screens.AuthScreen
 import com.example.ui.screens.ChatDetailScreen
@@ -479,20 +478,11 @@ fun WpChatApp(
         }
     }
 
-    var isSplashVisible by remember { mutableStateOf(true) }
-
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
-        if (isSplashVisible) {
-            NexaSplashScreen(
-                onAnimationFinished = {
-                    isSplashVisible = false
-                }
-            )
-        } else {
-            Scaffold(
+        Scaffold(
                 snackbarHost = {
                     SnackbarHost(
                         hostState = snackbarHostState,
@@ -994,7 +984,6 @@ fun WpChatApp(
                     }
                 )
             }
-        }
         }
     }
 }

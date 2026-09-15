@@ -1,12 +1,19 @@
-Please completely replace the content of `res/drawable/nexa_logo.xml` with this exact vector code:
-
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="512dp"
     android:height="512dp"
     android:viewportWidth="512"
     android:viewportHeight="512">
+    <!-- Outer Shield Frame with Sharp Angular Cutouts -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M 160 96 C 124.65 96 96 124.65 96 160 L 96 288 C 96 323.35 124.65 352 160 352 L 208 352 L 208 288 L 160 288 C 160 288 160 160 160 160 L 256 320 C 265 335 279 352 304 352 L 352 352 C 387.35 352 416 323.35 416 288 L 416 160 C 416 124.65 387.35 96 352 96 L 304 96 L 304 160 L 352 160 C 352 160 352 288 352 288 L 256 128 C 247 113 233 96 208 96 Z M 96 352 L 96 416 C 96 416 224 416 288 352 Z M 416 160 L 416 96 C 416 96 288 96 224 160 Z" />
+        android:pathData="M160,32 C100,32 32,100 32,160 L32,240 L80,192 L80,160 C80,116 116,80 160,80 L240,80 L288,32 Z M352,480 C412,480 480,412 480,352 L480,272 L432,320 L432,352 C432,396 396,432 352,432 L272,432 L224,480 Z" />
+    <!-- Inner Bold 'N' Core Emblem -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M160,112 C133.5,112 112,133.5 112,160 L112,336 L176,336 L176,220 L304,384 C320,404 340,400 352,400 C378.5,400 400,378.5 400,352 L400,176 L336,176 L336,292 L208,128 C192,108 172,112 160,112 Z" />
+    <!-- Outer Diagonal Slice Accents -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M288,64 L448,224 L448,176 L336,64 Z M224,448 L64,288 L64,336 L176,448 Z" />
 </vector>

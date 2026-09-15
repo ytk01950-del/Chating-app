@@ -1,40 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
-    android:viewportWidth="1000"
-    android:viewportHeight="1000">
-    <!-- Group 1: Top-Right Accent Corner Tab -->
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    <!-- Outer Shield Frame with Sharp Angular Cutouts -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M535,255 L690,255 C745,255 785,295 785,350 L785,475 L565,255 Z" />
-
-    <!-- Group 2: Bottom-Left Accent Corner Tab -->
+        android:pathData="M160,32 C100,32 32,100 32,160 L32,240 L80,192 L80,160 C80,116 116,80 160,80 L240,80 L288,32 Z M352,480 C412,480 480,412 480,352 L480,272 L432,320 L432,352 C432,396 396,432 352,432 L272,432 L224,480 Z" />
+    <!-- Inner Bold 'N' Core Emblem -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M465,745 L310,745 C255,745 215,705 215,650 L215,525 L435,745 Z" />
-
-    <!-- Group 3: Top-Left Outer Ribbon -->
+        android:pathData="M160,112 C133.5,112 112,133.5 112,160 L112,336 L176,336 L176,220 L304,384 C320,404 340,400 352,400 C378.5,400 400,378.5 400,352 L400,176 L336,176 L336,292 L208,128 C192,108 172,112 160,112 Z" />
+    <!-- Outer Diagonal Slice Accents -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M215,500 L215,350 C215,295 255,255 350,255 L430,255 C475,255 510,310 525,360 C475,305 385,295 330,330 C295,350 285,390 285,440 L285,500 Z" />
-
-    <!-- Group 4: Bottom-Right Outer Ribbon -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M785,500 L785,650 C785,705 745,745 650,745 L570,745 C525,745 490,690 475,640 C525,695 615,705 670,670 C705,650 715,610 715,560 L715,500 Z" />
-
-    <!-- Group 5: Left Vertical Block with top-left rounded corner arc -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M285,715 L435,715 L435,525 L335,425 C335,375 370,335 435,335 C470,335 505,355 530,380 C495,345 450,315 390,315 C315,315 285,365 285,435 Z" />
-
-    <!-- Group 6: Right Vertical Block with bottom-right rounded corner arc -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M715,285 L565,285 L565,475 L665,575 C665,625 630,665 565,665 C530,665 495,645 470,620 C505,655 550,685 610,685 C685,685 715,635 715,565 Z" />
-
-    <!-- Group 7: Diagonal Thick Connection Block with sharp cutout gaps -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M335,425 L435,325 L665,575 L565,675 Z" />
+        android:pathData="M288,64 L448,224 L448,176 L336,64 Z M224,448 L64,288 L64,336 L176,448 Z" />
 </vector>
