@@ -174,12 +174,10 @@ fun AuthScreen(
         ) {
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Prominent Centered Nexa Logo Graphic (Custom White Block N Canvas)
+            // Prominent Centered Nexa Logo Graphic (Exact Nexa Logo Image)
             CustomNexaLogo(
-                modifier = Modifier.size(100.dp),
-                shape = RoundedCornerShape(22.dp),
-                hasBorder = true,
-                borderColor = Color(0x33FFFFFF),
+                modifier = Modifier.size(80.dp),
+                hasBorder = false,
                 testTag = "auth_nexa_logo"
             )
 
