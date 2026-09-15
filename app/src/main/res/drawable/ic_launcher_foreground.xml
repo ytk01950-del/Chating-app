@@ -1,8 +1,40 @@
-<?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item
-        android:width="72dp"
-        android:height="72dp"
-        android:drawable="@drawable/nexa_logo"
-        android:gravity="center" />
-</layer-list>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="1000"
+    android:viewportHeight="1000">
+    <!-- Group 1: Top-Right Accent Corner Tab -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M535,255 L690,255 C745,255 785,295 785,350 L785,475 L565,255 Z" />
+
+    <!-- Group 2: Bottom-Left Accent Corner Tab -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M465,745 L310,745 C255,745 215,705 215,650 L215,525 L435,745 Z" />
+
+    <!-- Group 3: Top-Left Outer Ribbon -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M215,500 L215,350 C215,295 255,255 350,255 L430,255 C475,255 510,310 525,360 C475,305 385,295 330,330 C295,350 285,390 285,440 L285,500 Z" />
+
+    <!-- Group 4: Bottom-Right Outer Ribbon -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M785,500 L785,650 C785,705 745,745 650,745 L570,745 C525,745 490,690 475,640 C525,695 615,705 670,670 C705,650 715,610 715,560 L715,500 Z" />
+
+    <!-- Group 5: Left Vertical Block with top-left rounded corner arc -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M285,715 L435,715 L435,525 L335,425 C335,375 370,335 435,335 C470,335 505,355 530,380 C495,345 450,315 390,315 C315,315 285,365 285,435 Z" />
+
+    <!-- Group 6: Right Vertical Block with bottom-right rounded corner arc -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M715,285 L565,285 L565,475 L665,575 C665,625 630,665 565,665 C530,665 495,645 470,620 C505,655 550,685 610,685 C685,685 715,635 715,565 Z" />
+
+    <!-- Group 7: Diagonal Thick Connection Block with sharp cutout gaps -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M335,425 L435,325 L665,575 L565,675 Z" />
+</vector>

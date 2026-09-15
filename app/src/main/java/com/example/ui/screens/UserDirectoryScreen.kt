@@ -70,8 +70,10 @@ import com.example.model.UserStoryGroup
 import com.example.ui.components.AppFilterChip
 import com.example.ui.components.AppIconButton
 import com.example.ui.components.AppPrimaryButton
+import com.example.ui.components.CustomNexaLogo
 import com.example.ui.components.FloatingBottomNavBar
 import com.example.ui.components.NavigationTab
+import com.example.ui.components.NexaGeometricLogo
 import com.example.ui.components.StoryAvatarRing
 import com.example.ui.components.StoryTray
 import com.example.ui.components.UserAvatar
@@ -301,16 +303,27 @@ private fun ChatsTabView(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Chats",
-                    style = MaterialTheme.typography.headlineMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 28.sp,
-                        letterSpacing = (-0.5).sp
-                    ),
-                    color = colors.textPrimary,
-                    modifier = Modifier.testTag("dynamic_tab_title")
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    CustomNexaLogo(
+                        modifier = Modifier.size(32.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        hasBorder = false,
+                        testTag = "chats_tab_nexa_logo"
+                    )
+                    Text(
+                        text = "Chats",
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 28.sp,
+                            letterSpacing = (-0.5).sp
+                        ),
+                        color = colors.textPrimary,
+                        modifier = Modifier.testTag("dynamic_tab_title")
+                    )
+                }
 
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),

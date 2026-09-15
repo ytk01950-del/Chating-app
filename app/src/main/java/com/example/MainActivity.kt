@@ -92,6 +92,12 @@ class MainActivity : ComponentActivity() {
 
         val themePreferences = ThemePreferences(applicationContext)
 
+        val isUserLoggedIn = try {
+            com.google.firebase.auth.FirebaseAuth.getInstance().currentUser != null
+        } catch (e: Exception) {
+            false
+        }
+
         setContent {
             val currentThemeMode by themePreferences.themeMode.collectAsStateWithLifecycle()
 
@@ -103,6 +109,7 @@ class MainActivity : ComponentActivity() {
             ) {
                 WpChatApp(
                     viewModel = chatViewModel,
+                    initialHasActiveSession = isUserLoggedIn,
                     currentThemeMode = currentThemeMode,
                     onThemeModeChange = { newMode ->
                         themePreferences.setThemeMode(newMode)

@@ -83,6 +83,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.components.AvatarColorPairs
+import com.example.ui.components.CustomNexaLogo
 import com.example.ui.components.GoogleAuthHelper
 import com.example.ui.components.NexaGeometricLogo
 import com.example.ui.components.UserAvatar
@@ -173,9 +174,9 @@ fun AuthScreen(
         ) {
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Prominent Centered Nexa Logo
-            NexaGeometricLogo(
-                size = 88.dp,
+            // Prominent Centered Nexa Logo Graphic (Custom White Block N Canvas)
+            CustomNexaLogo(
+                modifier = Modifier.size(100.dp),
                 shape = RoundedCornerShape(22.dp),
                 hasBorder = true,
                 borderColor = Color(0x33FFFFFF),
