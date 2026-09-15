@@ -19,10 +19,13 @@ import com.example.util.FileUtils
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
+import com.google.firebase.storage.FirebaseStorage
+import com.google.firebase.storage.StorageMetadata
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
@@ -31,6 +34,7 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import java.io.InputStream
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -55,6 +59,17 @@ class FirebaseChatRepository {
             } catch (ex: Exception) {
                 Log.w(tag, "Falling back to default database instance: ${ex.message}")
                 FirebaseDatabase.getInstance()
+            }
+        }
+
+    private val storage: FirebaseStorage
+        get() = try {
+            FirebaseStorage.getInstance("gs://chating-a9250.firebasestorage.app")
+        } catch (e: Exception) {
+            try {
+                FirebaseStorage.getInstance()
+            } catch (ex: Exception) {
+                FirebaseStorage.getInstance(app)
             }
         }
 
@@ -1363,48 +1378,174 @@ class FirebaseChatRepository {
     }
 
     // -------------------------------------------------------------
-    // SOCIAL PROFILE & PHOTO UPLOADS (SUPABASE STORAGE $0 FREE TIER)
+    // PROFILE PICTURE UPLOADS & MANAGEMENT (FIREBASE STORAGE)
     // -------------------------------------------------------------
 
     suspend fun uploadProfilePhoto(
         userId: String,
         imageUri: Uri,
         context: Context,
-        oldPhotoUrl: String = ""
+        oldPhotoUrl: String = "",
+        onProgress: (Float) -> Unit = {}
     ): Result<String> {
         return try {
-            Log.d(tag, "Starting Supabase profile photo upload for userId: $userId, uri: $imageUri")
-            val uploadResult = SupabaseStorageService.uploadProfilePhoto(
-                userId = userId,
-                imageUri = imageUri,
-                context = context
-            )
+            Log.d(tag, "Starting compressed profile photo upload for userId: $userId, uri: $imageUri")
+            onProgress(0.1f)
 
-            uploadResult.fold(
-                onSuccess = { downloadUrl ->
-                    Log.d(tag, "Supabase profile photo uploaded successfully. Download URL: $downloadUrl")
-                    // Update user profile in Firebase database only after successful storage upload and URL retrieval
-                    database.getReference("users").child(userId).child("photoUrl").setValue(downloadUrl).await()
-                    Log.d(tag, "Successfully updated database photoUrl for user $userId")
+            // 1. Background image processing & compression with EXIF correction (max 1080x1080, target 200KB-500KB)
+            val compressedBytes = withContext(Dispatchers.IO) {
+                FileUtils.compressProfilePicture(context, imageUri, maxDimension = 1080)
+            } ?: return Result.failure(Exception("Failed to read and compress selected image"))
 
-                    // Clean up old profile photo in background if one existed
-                    if (oldPhotoUrl.isNotBlank() && oldPhotoUrl != downloadUrl) {
-                        try {
-                            SupabaseStorageService.deleteFileByUrl(oldPhotoUrl, context)
-                        } catch (delErr: Exception) {
-                            Log.w(tag, "Old photo cleanup notice (non-fatal): ${delErr.message}")
-                        }
+            Log.d(tag, "Profile image compressed (${compressedBytes.size} bytes). Uploading to Firebase Cloud Storage...")
+            onProgress(0.3f)
+
+            var downloadUrl: String? = null
+            val newFileName = "profile_${System.currentTimeMillis()}.jpg"
+
+            // 2. Upload to Firebase Cloud Storage with unique timestamped file name: profilePictures/{userId}/profile_{timestamp}.jpg
+            // The previous image remains completely untouched in storage during upload
+            try {
+                val storageRef = storage.reference.child("profilePictures/$userId/$newFileName")
+                val metadata = StorageMetadata.Builder()
+                    .setContentType("image/jpeg")
+                    .setCustomMetadata("userId", userId)
+                    .setCustomMetadata("uploadedAt", System.currentTimeMillis().toString())
+                    .build()
+
+                val uploadTask = storageRef.putBytes(compressedBytes, metadata)
+                uploadTask.addOnProgressListener { snapshot ->
+                    if (snapshot.totalByteCount > 0) {
+                        val fraction = (snapshot.bytesTransferred.toFloat() / snapshot.totalByteCount.toFloat()).coerceIn(0f, 1f)
+                        onProgress(0.3f + 0.6f * fraction)
                     }
-
-                    Result.success(downloadUrl)
-                },
-                onFailure = { err ->
-                    Log.e(tag, "Failed to upload profile photo to Supabase: ${err.message}", err)
-                    Result.failure(err)
                 }
-            )
+                uploadTask.await()
+                downloadUrl = storageRef.downloadUrl.await().toString()
+                Log.d(tag, "Firebase Cloud Storage upload succeeded. Download URL: $downloadUrl")
+            } catch (fbStorageErr: Exception) {
+                Log.w(tag, "Firebase Storage upload error: ${fbStorageErr.message}. Attempting secondary fallback...", fbStorageErr)
+                // Fallback to Supabase Storage if Firebase Storage experiences network or rule issues
+                val uploadResult = SupabaseStorageService.uploadProfilePhoto(
+                    userId = userId,
+                    imageUri = imageUri,
+                    context = context
+                )
+                if (uploadResult.isSuccess) {
+                    downloadUrl = uploadResult.getOrNull()
+                } else {
+                    throw fbStorageErr
+                }
+            }
+
+            if (downloadUrl.isNullOrBlank()) {
+                return Result.failure(Exception("Failed to retrieve download URL for uploaded profile picture"))
+            }
+
+            onProgress(0.95f)
+
+            // 3. Save download URL to Firebase Realtime Database
+            database.getReference("users").child(userId).child("photoUrl").setValue(downloadUrl).await()
+            Log.d(tag, "Successfully updated Firebase Database photoUrl for user $userId")
+
+            // 4. Update Firebase Auth user profile photo if applicable
+            try {
+                currentFirebaseUser?.let { fbUser ->
+                    if (fbUser.uid == userId) {
+                        val profileUpdates = UserProfileChangeRequest.Builder()
+                            .setPhotoUri(Uri.parse(downloadUrl))
+                            .build()
+                        fbUser.updateProfile(profileUpdates).await()
+                    }
+                }
+            } catch (authErr: Exception) {
+                Log.w(tag, "Firebase Auth profile photo update note: ${authErr.message}")
+            }
+
+            // 5. CRITICAL: Delete the previous Profile Picture ONLY after the new Profile Picture
+            // has been uploaded successfully and its database URL has been updated.
+            // Never delete the old image before the new upload succeeds.
+            if (oldPhotoUrl.isNotBlank() && oldPhotoUrl != downloadUrl) {
+                try {
+                    if (oldPhotoUrl.contains("firebasestorage.googleapis.com") || oldPhotoUrl.contains("appspot.com")) {
+                        try {
+                            val oldRef = storage.getReferenceFromUrl(oldPhotoUrl)
+                            oldRef.delete().await()
+                            Log.d(tag, "Successfully deleted previous profile photo from Firebase Storage: $oldPhotoUrl")
+                        } catch (fbDelErr: Exception) {
+                            Log.w(tag, "Firebase Storage old photo delete note (non-fatal): ${fbDelErr.message}")
+                        }
+                    } else if (oldPhotoUrl.contains("supabase")) {
+                        SupabaseStorageService.deleteFileByUrl(oldPhotoUrl, context)
+                        Log.d(tag, "Successfully deleted previous profile photo from Supabase Storage: $oldPhotoUrl")
+                    }
+                } catch (delErr: Exception) {
+                    Log.w(tag, "Old photo cleanup note (non-fatal): ${delErr.message}")
+                }
+            }
+
+            onProgress(1.0f)
+            Result.success(downloadUrl)
         } catch (e: Exception) {
             Log.e(tag, "Exception during uploadProfilePhoto: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun removeProfilePhoto(
+        userId: String,
+        oldPhotoUrl: String = ""
+    ): Result<Unit> {
+        return try {
+            Log.d(tag, "Removing profile photo for user: $userId")
+
+            // 1. Clear photoUrl in Firebase Realtime Database
+            database.getReference("users").child(userId).child("photoUrl").setValue("").await()
+            Log.d(tag, "Successfully cleared photoUrl in Firebase Database for user $userId")
+
+            // 2. Clear photo in Firebase Auth
+            try {
+                currentFirebaseUser?.let { fbUser ->
+                    if (fbUser.uid == userId) {
+                        val profileUpdates = UserProfileChangeRequest.Builder()
+                            .setPhotoUri(null)
+                            .build()
+                        fbUser.updateProfile(profileUpdates).await()
+                    }
+                }
+            } catch (authErr: Exception) {
+                Log.w(tag, "Auth photo removal note: ${authErr.message}")
+            }
+
+            // 3. Delete from Firebase Storage if it exists
+            if (oldPhotoUrl.isNotBlank() && (oldPhotoUrl.contains("firebasestorage.googleapis.com") || oldPhotoUrl.contains("appspot.com"))) {
+                try {
+                    val oldRef = storage.getReferenceFromUrl(oldPhotoUrl)
+                    oldRef.delete().await()
+                    Log.d(tag, "Deleted profile photo from Firebase Storage: $oldPhotoUrl")
+                } catch (fbDelErr: Exception) {
+                    Log.d(tag, "Firebase Storage delete note (non-fatal): ${fbDelErr.message}")
+                }
+            } else {
+                try {
+                    storage.reference.child("profilePictures/$userId/profile.jpg").delete().await()
+                } catch (e: Exception) {
+                    // Ignored
+                }
+            }
+
+            // 4. Delete from Supabase if old url was Supabase
+            if (oldPhotoUrl.isNotBlank() && oldPhotoUrl.contains("supabase")) {
+                try {
+                    SupabaseStorageService.deleteFileByUrl(oldPhotoUrl, null)
+                } catch (e: Exception) {
+                    // Ignored
+                }
+            }
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(tag, "Failed to remove profile photo: ${e.message}", e)
             Result.failure(e)
         }
     }

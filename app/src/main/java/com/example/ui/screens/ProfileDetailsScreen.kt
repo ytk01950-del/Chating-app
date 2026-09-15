@@ -1,6 +1,10 @@
 package com.example.ui.screens
 
+import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
@@ -29,7 +33,9 @@ import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Cake
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
@@ -38,7 +44,9 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PersonRemove
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
@@ -46,13 +54,16 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -60,6 +71,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -97,6 +109,13 @@ fun ProfileDetailsScreen(
     currentUser: User,
     profileUser: User,
     isFollowing: Boolean,
+    isUploadingPhoto: Boolean = false,
+    photoUploadProgress: Float = 0f,
+    photoUploadError: String? = null,
+    onUploadProfilePhoto: (Uri) -> Unit = {},
+    onRemoveProfilePhoto: () -> Unit = {},
+    onRetryUpload: () -> Unit = {},
+    onClearUploadError: () -> Unit = {},
     onBack: (() -> Unit)? = null,
     onOpenChat: (User) -> Unit = {},
     onFollowClick: (User) -> Unit = {},
@@ -116,6 +135,18 @@ fun ProfileDetailsScreen(
     var showUnfollowDialog by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     var showEditProfileDialog by remember { mutableStateOf(false) }
+    var showPhotoOptionsDialog by remember { mutableStateOf(false) }
+    var showRemovePhotoConfirmDialog by remember { mutableStateOf(false) }
+
+    // Modern Android Photo Picker (zero-permission, safe & fast)
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        uri?.let {
+            onClearUploadError()
+            onUploadProfilePhoto(it)
+        }
+    }
 
     // Privacy settings local states (editable if isSelf)
     var whoCanFollow by remember(profileUser.whoCanFollow) { mutableStateOf(profileUser.whoCanFollow) }
@@ -324,20 +355,131 @@ fun ProfileDetailsScreen(
                             .padding(20.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        // PROFILE AVATAR
-                        Box(contentAlignment = Alignment.Center) {
+                        // PROFILE AVATAR (Clean circular avatar with no camera badge or status dot overlay)
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .then(
+                                    if (isSelf && !isUploadingPhoto) {
+                                        Modifier.clickable {
+                                            if (profileUser.photoUrl.isNotBlank()) {
+                                                showPhotoOptionsDialog = true
+                                            } else {
+                                                photoPickerLauncher.launch(
+                                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                                )
+                                            }
+                                        }
+                                    } else Modifier
+                                )
+                                .testTag("profile_avatar_container")
+                        ) {
                             UserAvatar(
                                 name = profileUser.displayName.ifBlank { profileUser.username },
                                 avatarId = profileUser.avatarId,
                                 photoUrl = profileUser.photoUrl,
-                                size = 84.dp,
-                                isOnline = profileUser.isOnline
+                                size = 96.dp,
+                                isOnline = null
                             )
+
+                            // Uploading Overlay
+                            if (isUploadingPhoto) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(96.dp)
+                                        .clip(CircleShape)
+                                        .background(Color.Black.copy(alpha = 0.65f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CircularProgressIndicator(
+                                        color = Color.White,
+                                        modifier = Modifier.size(36.dp),
+                                        strokeWidth = 3.5.dp
+                                    )
+                                }
+                            }
                         }
 
-                        Spacer(modifier = Modifier.height(14.dp))
+                        // Uploading Status / Progress Bar
+                        if (isUploadingPhoto) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                LinearProgressIndicator(
+                                    progress = { photoUploadProgress.coerceIn(0.1f, 1f) },
+                                    modifier = Modifier
+                                        .width(140.dp)
+                                        .height(4.dp)
+                                        .clip(RoundedCornerShape(2.dp)),
+                                    color = colors.textPrimary,
+                                    trackColor = colors.surfaceVariant
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = if (photoUploadProgress < 0.3f) "Compressing photo..." else "Uploading... ${(photoUploadProgress * 100).toInt()}%",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = colors.textSecondary
+                                )
+                            }
+                        }
 
-                        // USER INFORMATION
+                        // Upload Error Banner with Retry
+                        if (isSelf && photoUploadError != null) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f)),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Upload failed",
+                                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                            color = MaterialTheme.colorScheme.onErrorContainer
+                                        )
+                                        Text(
+                                            text = photoUploadError,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onErrorContainer,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Button(
+                                        onClick = onRetryUpload,
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.error,
+                                            contentColor = MaterialTheme.colorScheme.onError
+                                        ),
+                                        shape = RoundedCornerShape(8.dp),
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                        modifier = Modifier.height(32.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Refresh,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Retry", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // USER INFORMATION: Display Name in bold directly below avatar
                         Text(
                             text = profileUser.displayName.ifBlank { profileUser.username.ifBlank { "User" } },
                             style = MaterialTheme.typography.titleLarge.copy(
@@ -348,12 +490,13 @@ fun ProfileDetailsScreen(
                             textAlign = TextAlign.Center
                         )
 
+                        // Username in smaller text underneath
                         if (profileUser.username.isNotBlank()) {
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "@${profileUser.username}",
+                                text = if (profileUser.username.startsWith("@")) profileUser.username else "@${profileUser.username}",
                                 style = MaterialTheme.typography.bodyMedium.copy(
-                                    fontWeight = FontWeight.Medium,
+                                    fontWeight = FontWeight.Normal,
                                     fontSize = 14.sp
                                 ),
                                 color = colors.textSecondary,
@@ -475,7 +618,7 @@ fun ProfileDetailsScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             if (isSelf) {
-                                // For Self Profile: Edit Profile Button
+                                // For Self Profile: "Edit Profile" white button with pencil edit icon and text label
                                 Button(
                                     onClick = { showEditProfileDialog = true },
                                     modifier = Modifier
@@ -484,10 +627,10 @@ fun ProfileDetailsScreen(
                                         .pressScale()
                                         .testTag("edit_profile_self_button"),
                                     shape = RoundedCornerShape(14.dp),
-                                    border = if (colors.isDark) BorderStroke(1.dp, Color(0xFF3E3E3E)) else null,
+                                    border = BorderStroke(1.dp, if (colors.isDark) Color(0xFFE0E0E0) else Color(0xFFD1D5DB)),
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (colors.isDark) Color(0xFF1E1E1E) else Color(0xFF111111),
-                                        contentColor = Color.White
+                                        containerColor = Color.White,
+                                        contentColor = Color(0xFF111111)
                                     ),
                                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
                                 ) {
@@ -499,15 +642,15 @@ fun ProfileDetailsScreen(
                                         Icon(
                                             imageVector = Icons.Default.Edit,
                                             contentDescription = null,
-                                            tint = Color.White,
-                                            modifier = Modifier.size(16.dp)
+                                            modifier = Modifier.size(16.dp),
+                                            tint = Color(0xFF111111)
                                         )
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
                                             text = "Edit Profile",
                                             fontWeight = FontWeight.SemiBold,
                                             fontSize = 14.sp,
-                                            color = Color.White,
+                                            color = Color(0xFF111111),
                                             maxLines = 1,
                                             softWrap = false,
                                             textAlign = TextAlign.Center
@@ -515,38 +658,49 @@ fun ProfileDetailsScreen(
                                     }
                                 }
                             } else {
-                                // Left Button: Follow / Following Toggle
+                                // For Other User: Follow / Following Toggle Text Button
                                 if (isFollowing) {
-                                    // State: Following -> Click opens Unfollow Confirmation Dialog
+                                    // Following state: Tapping toggles back to Follow
                                     OutlinedButton(
-                                        onClick = { showUnfollowDialog = true },
+                                        onClick = { onUnfollowClick(profileUser) },
                                         modifier = Modifier
                                             .weight(1f)
                                             .height(46.dp)
                                             .pressScale()
                                             .testTag("profile_following_button"),
                                         shape = RoundedCornerShape(14.dp),
-                                        border = BorderStroke(1.dp, if (colors.isDark) Color(0xFF3E3E3E) else Color(0xFFCCCCCC)),
+                                        border = BorderStroke(1.dp, if (colors.isDark) Color(0xFF444444) else Color(0xFFCCCCCC)),
                                         colors = ButtonDefaults.outlinedButtonColors(
-                                            containerColor = if (colors.isDark) Color(0xFF1E1E1E) else Color(0xFFEFEFEF),
+                                            containerColor = if (colors.isDark) Color(0xFF222222) else Color(0xFFEFEFEF),
                                             contentColor = colors.textPrimary
                                         ),
                                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
                                     ) {
-                                        Box(
-                                            contentAlignment = Alignment.Center,
-                                            modifier = Modifier.fillMaxSize()
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.Center,
+                                            modifier = Modifier.wrapContentWidth()
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Default.Check,
-                                                contentDescription = "Following",
-                                                modifier = Modifier.size(20.dp),
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp),
                                                 tint = colors.textPrimary
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = "Following",
+                                                fontWeight = FontWeight.SemiBold,
+                                                fontSize = 14.sp,
+                                                color = colors.textPrimary,
+                                                maxLines = 1,
+                                                softWrap = false,
+                                                textAlign = TextAlign.Center
                                             )
                                         }
                                     }
                                 } else {
-                                    // State: Follow -> Black filled button
+                                    // Follow state: Prominent Follow button, tapping toggles to Following
                                     Button(
                                         onClick = { onFollowClick(profileUser) },
                                         modifier = Modifier
@@ -561,14 +715,26 @@ fun ProfileDetailsScreen(
                                         ),
                                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
                                     ) {
-                                        Box(
-                                            contentAlignment = Alignment.Center,
-                                            modifier = Modifier.fillMaxSize()
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.Center,
+                                            modifier = Modifier.wrapContentWidth()
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Default.PersonAdd,
-                                                contentDescription = "Follow",
-                                                modifier = Modifier.size(20.dp)
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp),
+                                                tint = if (colors.isDark) Color.Black else Color.White
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = "Follow",
+                                                fontWeight = FontWeight.SemiBold,
+                                                fontSize = 14.sp,
+                                                color = if (colors.isDark) Color.Black else Color.White,
+                                                maxLines = 1,
+                                                softWrap = false,
+                                                textAlign = TextAlign.Center
                                             )
                                         }
                                     }
@@ -948,6 +1114,137 @@ fun ProfileDetailsScreen(
     }
 
     // ==================================================
+    // PHOTO OPTIONS ACTION DIALOG (FOR SELF)
+    // ==================================================
+    if (showPhotoOptionsDialog) {
+        AlertDialog(
+            onDismissRequest = { showPhotoOptionsDialog = false },
+            title = {
+                Text(
+                    text = "Profile Picture",
+                    fontWeight = FontWeight.Bold,
+                    color = colors.textPrimary
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Option 1: Choose New Photo
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable {
+                                showPhotoOptionsDialog = false
+                                photoPickerLauncher.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                )
+                            }
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PhotoLibrary,
+                            contentDescription = null,
+                            tint = colors.textPrimary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Text(
+                            text = "Choose New Photo",
+                            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                            color = colors.textPrimary
+                        )
+                    }
+
+                    // Option 2: Remove Profile Picture
+                    if (profileUser.photoUrl.isNotBlank()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable {
+                                    showPhotoOptionsDialog = false
+                                    showRemovePhotoConfirmDialog = true
+                                }
+                                .padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = null,
+                                tint = Color(0xFFDC2626),
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.width(14.dp))
+                            Text(
+                                text = "Remove Profile Picture",
+                                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                                color = Color(0xFFDC2626)
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showPhotoOptionsDialog = false }) {
+                    Text("Cancel", color = colors.textSecondary)
+                }
+            },
+            containerColor = colors.surfaceElevated,
+            shape = RoundedCornerShape(18.dp)
+        )
+    }
+
+    // ==================================================
+    // REMOVE PHOTO CONFIRMATION DIALOG (FOR SELF)
+    // ==================================================
+    if (showRemovePhotoConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showRemovePhotoConfirmDialog = false },
+            title = {
+                Text(
+                    text = "Remove Profile Picture?",
+                    fontWeight = FontWeight.Bold,
+                    color = colors.textPrimary
+                )
+            },
+            text = {
+                Text(
+                    text = "Your current profile photo will be removed and restored to your default avatar.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.textSecondary
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showRemovePhotoConfirmDialog = false
+                        onRemoveProfilePhoto()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFDC2626),
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("Remove", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRemovePhotoConfirmDialog = false }) {
+                    Text("Cancel", color = colors.textSecondary)
+                }
+            },
+            containerColor = colors.surfaceElevated,
+            shape = RoundedCornerShape(18.dp)
+        )
+    }
+
+    // ==================================================
     // EDIT PROFILE DIALOG (FOR SELF)
     // ==================================================
     if (showEditProfileDialog) {
@@ -970,6 +1267,72 @@ fun ProfileDetailsScreen(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
+                    // Profile Photo preview & actions in Edit Profile
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        UserAvatar(
+                            name = editName.ifBlank { currentUser.username },
+                            avatarId = currentUser.avatarId,
+                            photoUrl = currentUser.photoUrl,
+                            size = 54.dp
+                        )
+                        Column {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(
+                                    onClick = {
+                                        photoPickerLauncher.launch(
+                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                        )
+                                    },
+                                    shape = RoundedCornerShape(8.dp),
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                    modifier = Modifier.height(32.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CameraAlt,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(14.dp),
+                                        tint = colors.textPrimary
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = if (currentUser.photoUrl.isNotBlank()) "Change" else "Add Photo",
+                                        fontSize = 12.sp,
+                                        color = colors.textPrimary
+                                    )
+                                }
+                                if (currentUser.photoUrl.isNotBlank()) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            showRemovePhotoConfirmDialog = true
+                                        },
+                                        shape = RoundedCornerShape(8.dp),
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                        modifier = Modifier.height(32.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(14.dp),
+                                            tint = Color(0xFFDC2626)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "Remove",
+                                            fontSize = 12.sp,
+                                            color = Color(0xFFDC2626)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     OutlinedTextField(
                         value = editName,
                         onValueChange = { editName = it },

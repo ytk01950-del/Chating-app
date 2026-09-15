@@ -208,6 +208,8 @@ fun WpChatApp(
     val isSettingsOpen by viewModel.isSettingsOpen.collectAsStateWithLifecycle()
     val leaderboardUsers by viewModel.leaderboardUsers.collectAsStateWithLifecycle()
     val isLeaderboardLoading by viewModel.isLeaderboardLoading.collectAsStateWithLifecycle()
+    val profilePhotoUploadProgress by viewModel.profilePhotoUploadProgress.collectAsStateWithLifecycle()
+    val profilePhotoUploadError by viewModel.profilePhotoUploadError.collectAsStateWithLifecycle()
 
     // Real-time Active App Usage Tracker (tracks only while app is in foreground)
     val activeTrackingLifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
@@ -700,6 +702,21 @@ fun WpChatApp(
                                 currentUser = user,
                                 profileUser = profileUser,
                                 isFollowing = followedUserIds.contains(profileUser.id),
+                                isUploadingPhoto = isUploadingProfilePhoto,
+                                photoUploadProgress = profilePhotoUploadProgress,
+                                photoUploadError = profilePhotoUploadError,
+                                onUploadProfilePhoto = { uri ->
+                                    viewModel.uploadProfilePhoto(uri, context)
+                                },
+                                onRemoveProfilePhoto = {
+                                    viewModel.removeProfilePhoto()
+                                },
+                                onRetryUpload = {
+                                    viewModel.retryProfilePhotoUpload(context)
+                                },
+                                onClearUploadError = {
+                                    viewModel.clearProfilePhotoError()
+                                },
                                 onBack = { viewModel.closeUserProfile() },
                                 onOpenChat = { targetUser ->
                                     viewModel.closeUserProfile()

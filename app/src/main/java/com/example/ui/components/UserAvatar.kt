@@ -47,6 +47,7 @@ fun UserAvatar(
     photoUrl: String = "",
     size: Dp = 48.dp,
     isOnline: Boolean? = null,
+    statusBorderColor: Color = DarkSurface,
     modifier: Modifier = Modifier
 ) {
     val colorIndex = (avatarId.coerceAtLeast(0)) % AvatarColorPairs.size
@@ -132,7 +133,7 @@ fun UserAvatar(
                     .size(badgeSize)
                     .clip(CircleShape)
                     .background(if (isOnline) OnlineGreen else OfflineGray)
-                    .border(2.dp, DarkSurface, CircleShape)
+                    .border(2.dp, statusBorderColor, CircleShape)
             )
         }
     }

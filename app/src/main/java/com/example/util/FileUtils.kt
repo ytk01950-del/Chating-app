@@ -4,12 +4,15 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Matrix
+import android.media.ExifInterface
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.util.Log
 import android.webkit.MimeTypeMap
 import android.widget.Toast
 import com.example.model.MessageType
+import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
@@ -79,6 +82,155 @@ object FileUtils {
         } catch (e: Exception) {
             Log.w(TAG, "Image compression fallback to raw bytes: ${e.message}")
             readBytesFromUri(context, uri)
+        }
+    }
+
+    /**
+     * Dedicated Profile Picture compression engine:
+     * 1. Extracts EXIF orientation and normalizes image rotation
+     * 2. Proportional downsampling to maximum resolution <= 1080x1080
+     * 3. Adaptive JPEG compression targeting 200 KB - 500 KB file size
+     * 4. Preserves crisp visual quality without excessive blur or distortion
+     */
+    fun compressProfilePicture(
+        context: Context,
+        uri: Uri,
+        maxDimension: Int = 1080
+    ): ByteArray? {
+        return try {
+            val rawBytes = readBytesFromUri(context, uri) ?: return null
+            if (rawBytes.isEmpty()) return null
+
+            Log.d(TAG, "Raw selected profile picture size: ${rawBytes.size} bytes (${formatFileSize(rawBytes.size.toLong())})")
+
+            // 1. Inspect EXIF orientation
+            var orientation = ExifInterface.ORIENTATION_NORMAL
+            try {
+                ByteArrayInputStream(rawBytes).use { inputStream ->
+                    val exif = ExifInterface(inputStream)
+                    orientation = exif.getAttributeInt(
+                        ExifInterface.TAG_ORIENTATION,
+                        ExifInterface.ORIENTATION_NORMAL
+                    )
+                }
+            } catch (exifErr: Exception) {
+                Log.w(TAG, "EXIF extraction note: ${exifErr.message}")
+            }
+
+            // 2. Decode raw dimensions
+            val boundsOptions = BitmapFactory.Options().apply {
+                inJustDecodeBounds = true
+            }
+            BitmapFactory.decodeByteArray(rawBytes, 0, rawBytes.size, boundsOptions)
+            var rawWidth = boundsOptions.outWidth
+            var rawHeight = boundsOptions.outHeight
+
+            if (rawWidth <= 0 || rawHeight <= 0) {
+                return rawBytes
+            }
+
+            // If EXIF says rotated 90 or 270, swap dimensions for downsample calculation
+            val isSwapped = orientation == ExifInterface.ORIENTATION_ROTATE_90 ||
+                    orientation == ExifInterface.ORIENTATION_ROTATE_270 ||
+                    orientation == ExifInterface.ORIENTATION_TRANSPOSE ||
+                    orientation == ExifInterface.ORIENTATION_TRANSVERSE
+            val effectiveWidth = if (isSwapped) rawHeight else rawWidth
+            val effectiveHeight = if (isSwapped) rawWidth else rawHeight
+
+            // 3. Calculate inSampleSize
+            var inSampleSize = 1
+            while (effectiveWidth / inSampleSize > (maxDimension * 2) || effectiveHeight / inSampleSize > (maxDimension * 2)) {
+                inSampleSize *= 2
+            }
+
+            val decodeOptions = BitmapFactory.Options().apply {
+                this.inSampleSize = inSampleSize
+                inPreferredConfig = Bitmap.Config.ARGB_8888
+            }
+
+            val decodedBitmap = BitmapFactory.decodeByteArray(rawBytes, 0, rawBytes.size, decodeOptions)
+                ?: return rawBytes
+
+            // 4. Correct EXIF Orientation
+            val matrix = Matrix()
+            when (orientation) {
+                ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
+                ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
+                ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
+                ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.postScale(-1f, 1f)
+                ExifInterface.ORIENTATION_FLIP_VERTICAL -> matrix.postScale(1f, -1f)
+                ExifInterface.ORIENTATION_TRANSPOSE -> {
+                    matrix.postRotate(90f)
+                    matrix.postScale(-1f, 1f)
+                }
+                ExifInterface.ORIENTATION_TRANSVERSE -> {
+                    matrix.postRotate(270f)
+                    matrix.postScale(-1f, 1f)
+                }
+                else -> { /* Normal orientation */ }
+            }
+
+            val orientedBitmap = if (!matrix.isIdentity) {
+                val transformed = Bitmap.createBitmap(
+                    decodedBitmap, 0, 0,
+                    decodedBitmap.width, decodedBitmap.height,
+                    matrix, true
+                )
+                if (transformed != decodedBitmap) {
+                    decodedBitmap.recycle()
+                }
+                transformed
+            } else {
+                decodedBitmap
+            }
+
+            // 5. Proportional scaling to <= 1080x1080 preserving original aspect ratio
+            val currentWidth = orientedBitmap.width
+            val currentHeight = orientedBitmap.height
+            val scale = if (currentWidth > maxDimension || currentHeight > maxDimension) {
+                minOf(maxDimension.toFloat() / currentWidth, maxDimension.toFloat() / currentHeight)
+            } else {
+                1.0f
+            }
+
+            val targetBitmap = if (scale < 1.0f) {
+                val targetW = (currentWidth * scale).toInt().coerceAtLeast(1)
+                val targetH = (currentHeight * scale).toInt().coerceAtLeast(1)
+                val scaled = Bitmap.createScaledBitmap(orientedBitmap, targetW, targetH, true)
+                if (scaled != orientedBitmap) {
+                    orientedBitmap.recycle()
+                }
+                scaled
+            } else {
+                orientedBitmap
+            }
+
+            // 6. Adaptive JPEG Quality Compression (Targeting ~200 KB – 500 KB)
+            var currentQuality = 85
+            var compressedBytes: ByteArray
+            var attempts = 0
+            val targetMaxBytes = 500 * 1024 // 500 KB
+            val targetMinBytes = 180 * 1024 // ~200 KB
+
+            do {
+                val stream = ByteArrayOutputStream()
+                targetBitmap.compress(Bitmap.CompressFormat.JPEG, currentQuality, stream)
+                compressedBytes = stream.toByteArray()
+                attempts++
+
+                if (compressedBytes.size > targetMaxBytes && currentQuality > 50) {
+                    currentQuality -= 10
+                } else {
+                    break
+                }
+            } while (attempts < 5 && currentQuality >= 50)
+
+            targetBitmap.recycle()
+            Log.d(TAG, "Compressed profile picture size: ${compressedBytes.size} bytes (${formatFileSize(compressedBytes.size.toLong())}) at quality $currentQuality%")
+            compressedBytes
+        } catch (e: Exception) {
+            Log.e(TAG, "Profile picture compression failed: ${e.message}", e)
+            compressImageForUpload(context, uri, maxDimension = 1080, quality = 80)
         }
     }
 

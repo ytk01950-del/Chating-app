@@ -93,6 +93,15 @@ class ChatViewModel(
     private val _isUploadingProfilePhoto = MutableStateFlow(false)
     val isUploadingProfilePhoto: StateFlow<Boolean> = _isUploadingProfilePhoto.asStateFlow()
 
+    private val _profilePhotoUploadProgress = MutableStateFlow(0f)
+    val profilePhotoUploadProgress: StateFlow<Float> = _profilePhotoUploadProgress.asStateFlow()
+
+    private val _profilePhotoUploadError = MutableStateFlow<String?>(null)
+    val profilePhotoUploadError: StateFlow<String?> = _profilePhotoUploadError.asStateFlow()
+
+    private val _lastFailedProfilePhotoUri = MutableStateFlow<Uri?>(null)
+    val lastFailedProfilePhotoUri: StateFlow<Uri?> = _lastFailedProfilePhotoUri.asStateFlow()
+
     private val _isCreatingStory = MutableStateFlow(false)
     val isCreatingStory: StateFlow<Boolean> = _isCreatingStory.asStateFlow()
 
@@ -932,7 +941,12 @@ class ChatViewModel(
 
     fun uploadProfilePhoto(uri: Uri, context: Context) {
         val current = _currentUser.value ?: return
+        if (_isUploadingProfilePhoto.value) return // Prevent concurrent duplicate uploads
+
         _isUploadingProfilePhoto.value = true
+        _profilePhotoUploadProgress.value = 0.05f
+        _profilePhotoUploadError.value = null
+        _lastFailedProfilePhotoUri.value = null
 
         viewModelScope.launch {
             val oldPhotoUrl = current.photoUrl
@@ -940,7 +954,10 @@ class ChatViewModel(
                 userId = current.id,
                 imageUri = uri,
                 context = context,
-                oldPhotoUrl = oldPhotoUrl
+                oldPhotoUrl = oldPhotoUrl,
+                onProgress = { progress ->
+                    _profilePhotoUploadProgress.value = progress
+                }
             )
             _isUploadingProfilePhoto.value = false
             result.onSuccess { newPhotoUrl ->
@@ -949,9 +966,55 @@ class ChatViewModel(
                 if (_selectedProfileUser.value?.id == current.id) {
                     _selectedProfileUser.value = updated
                 }
-                _infoMessage.value = "Profile photo updated!"
+                _profilePhotoUploadError.value = null
+                _lastFailedProfilePhotoUri.value = null
+                _infoMessage.value = "Profile picture updated successfully!"
             }.onFailure { err ->
-                _errorMessage.value = "Failed to update profile photo: ${err.localizedMessage ?: err.message ?: "Unknown error"}"
+                val errorText = err.localizedMessage ?: err.message ?: "Failed to upload image"
+                _profilePhotoUploadError.value = errorText
+                _lastFailedProfilePhotoUri.value = uri
+                _errorMessage.value = "Profile photo upload failed: $errorText"
+            }
+        }
+    }
+
+    fun retryProfilePhotoUpload(context: Context) {
+        val failedUri = _lastFailedProfilePhotoUri.value ?: return
+        uploadProfilePhoto(failedUri, context)
+    }
+
+    fun clearProfilePhotoError() {
+        _profilePhotoUploadError.value = null
+        _lastFailedProfilePhotoUri.value = null
+    }
+
+    fun removeProfilePhoto() {
+        val current = _currentUser.value ?: return
+        if (_isUploadingProfilePhoto.value) return
+
+        _isUploadingProfilePhoto.value = true
+        _profilePhotoUploadProgress.value = 0.5f
+
+        viewModelScope.launch {
+            val oldPhotoUrl = current.photoUrl
+            val result = repository.removeProfilePhoto(
+                userId = current.id,
+                oldPhotoUrl = oldPhotoUrl
+            )
+            _isUploadingProfilePhoto.value = false
+            _profilePhotoUploadProgress.value = 0f
+
+            result.onSuccess {
+                val updated = current.copy(photoUrl = "")
+                _currentUser.value = updated
+                if (_selectedProfileUser.value?.id == current.id) {
+                    _selectedProfileUser.value = updated
+                }
+                _profilePhotoUploadError.value = null
+                _lastFailedProfilePhotoUri.value = null
+                _infoMessage.value = "Profile picture removed."
+            }.onFailure { err ->
+                _errorMessage.value = "Failed to remove profile picture: ${err.localizedMessage ?: err.message}"
             }
         }
     }
