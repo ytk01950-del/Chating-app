@@ -112,6 +112,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -575,11 +576,17 @@ fun ChatDetailScreen(
                 } else {
                     LazyColumn(
                         state = listState,
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer { },
                         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        items(messages, key = { it.id }) { message ->
+                        items(
+                            items = messages,
+                            key = { it.id },
+                            contentType = { it.messageType }
+                        ) { message ->
                             val isMe = message.senderId == currentUser.id
                             SophisticatedMessageBubble(
                                 message = message,
@@ -633,7 +640,7 @@ fun ChatDetailScreen(
                             .padding(horizontal = 12.dp, vertical = 8.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        items(QuickEmojis) { emoji ->
+                        items(QuickEmojis, key = { it }) { emoji ->
                             Text(
                                 text = emoji,
                                 fontSize = 22.sp,
@@ -1250,7 +1257,9 @@ fun SophisticatedMessageBubble(
     val isExpired = message.isMediaExpired()
 
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer { },
         horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start
     ) {
         Column(

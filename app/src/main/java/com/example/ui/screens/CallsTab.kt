@@ -51,6 +51,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -95,6 +96,7 @@ fun CallsTab(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
+                .graphicsLayer { }
                 .testTag("calls_history_list"),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 90.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -265,7 +267,11 @@ fun CallsTab(
                     }
                 }
             } else {
-                items(filteredCalls, key = { it.id.ifBlank { "${it.callId}_${it.timestamp}" } }) { callRecord ->
+                items(
+                    items = filteredCalls,
+                    key = { it.id.ifBlank { "${it.callId}_${it.timestamp}" } },
+                    contentType = { "call_record" }
+                ) { callRecord ->
                     val otherUser = remember(callRecord.otherUserId, callRecord.otherUserName, callRecord.otherUserUsername, callRecord.otherUserPhotoUrl, callRecord.otherUserAvatarId) {
                         User(
                             id = callRecord.otherUserId,
@@ -371,7 +377,11 @@ fun CallsTab(
                                 .height(260.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            items(filteredUsers, key = { it.id }) { user ->
+                            items(
+                                items = filteredUsers,
+                                key = { it.id },
+                                contentType = { "user_picker_item" }
+                            ) { user ->
                                 Surface(
                                     color = colors.cardBackground,
                                     shape = RoundedCornerShape(12.dp),
@@ -483,6 +493,7 @@ fun CallHistoryItemCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .graphicsLayer { }
             .testTag("call_item_${record.callId}"),
         colors = CardDefaults.cardColors(containerColor = colors.cardBackground),
         shape = RoundedCornerShape(14.dp),

@@ -47,6 +47,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -104,6 +105,7 @@ fun LeaderboardScreen(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
+                .graphicsLayer { }
                 .testTag("leaderboard_list"),
             contentPadding = PaddingValues(
                 start = 16.dp,
@@ -201,7 +203,7 @@ fun LeaderboardScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Rankings update in real-time based on active time spent using WP CHAT in foreground.",
+                                text = "Rankings update in real-time based on active time spent using Nexachat in foreground.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = Color.White.copy(alpha = 0.65f),
                                 fontSize = 11.5.sp,
@@ -270,7 +272,8 @@ fun LeaderboardScreen(
             // 5. Remaining Ranks List (Rank 4 to 100)
             itemsIndexed(
                 items = remainingUsers,
-                key = { _, user -> user.id.ifBlank { "user_${user.username}" } }
+                key = { _, user -> user.id.ifBlank { "user_${user.username}" } },
+                contentType = { _, _ -> "leaderboard_row" }
             ) { index, user ->
                 val rank = index + 4
                 val isCurrentUser = user.id == currentUser?.id
@@ -705,6 +708,7 @@ private fun LeaderboardRowItem(
         ),
         modifier = modifier
             .fillMaxWidth()
+            .graphicsLayer { }
             .clickable(onClick = onClick)
             .testTag("leaderboard_user_row_$rank")
     ) {

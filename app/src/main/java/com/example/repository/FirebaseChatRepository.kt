@@ -314,7 +314,7 @@ class FirebaseChatRepository {
                 email = cleanEmail,
                 displayName = resolvedName,
                 avatarId = avatarId,
-                statusMessage = "Hey there! I am using WP CHAT.",
+                statusMessage = "Hey there! I am using Nexachat.",
                 isOnline = true,
                 lastSeen = System.currentTimeMillis(),
                 createdAt = System.currentTimeMillis()
@@ -364,7 +364,7 @@ class FirebaseChatRepository {
                     email = cleanEmail,
                     displayName = fallbackName,
                     avatarId = 0,
-                    statusMessage = "Hey there! I am using WP CHAT.",
+                    statusMessage = "Hey there! I am using Nexachat.",
                     isOnline = true,
                     lastSeen = System.currentTimeMillis(),
                     createdAt = System.currentTimeMillis()
@@ -421,7 +421,7 @@ class FirebaseChatRepository {
                     email = email,
                     displayName = fallbackName,
                     avatarId = 0,
-                    statusMessage = "Hey there! I am using WP CHAT.",
+                    statusMessage = "Hey there! I am using Nexachat.",
                     isOnline = true,
                     lastSeen = System.currentTimeMillis(),
                     createdAt = System.currentTimeMillis()

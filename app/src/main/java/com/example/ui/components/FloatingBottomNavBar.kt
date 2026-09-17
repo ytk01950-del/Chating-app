@@ -2,15 +2,19 @@ package com.example.ui.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -34,12 +38,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -101,150 +103,175 @@ fun FloatingBottomNavBar(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 NavigationTab.entries.forEach { tab ->
-                    val isSelected = tab == selectedTab
-
-                    val animatedBgColor by animateColorAsState(
-                        targetValue = if (isSelected) {
-                            if (colors.isDark) Color(0xFF262626) else Color(0xFFEFEFEF)
-                        } else Color.Transparent,
-                        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                        label = "tab_bg_color"
+                    FloatingNavTabItem(
+                        tab = tab,
+                        isSelected = tab == selectedTab,
+                        unreadChatsCount = if (tab == NavigationTab.CHATS) unreadChatsCount else 0,
+                        missedCallsCount = if (tab == NavigationTab.CALLS) missedCallsCount else 0,
+                        hasNewStories = if (tab == NavigationTab.STORIES) hasNewStories else false,
+                        onTabSelected = onTabSelected
                     )
+                }
+            }
+        }
+    }
+}
 
-                    val animatedBorderColor by animateColorAsState(
-                        targetValue = if (isSelected) {
-                            if (colors.isDark) Color(0xFF363636) else Color(0xFFDBDBDB)
-                        } else Color.Transparent,
-                        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                        label = "tab_border_color"
-                    )
+@Composable
+private fun RowScope.FloatingNavTabItem(
+    tab: NavigationTab,
+    isSelected: Boolean,
+    unreadChatsCount: Int,
+    missedCallsCount: Int,
+    hasNewStories: Boolean,
+    onTabSelected: (NavigationTab) -> Unit
+) {
+    val colors = AppTheme.colors
 
-                    val animatedContentColor by animateColorAsState(
-                        targetValue = if (isSelected) {
-                            if (colors.isDark) Color.White else Color(0xFF111111)
-                        } else colors.textMuted,
-                        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                        label = "tab_content_color"
-                    )
+    val animatedBgColor by animateColorAsState(
+        targetValue = if (isSelected) {
+            if (colors.isDark) Color(0xFF262626) else Color(0xFFEFEFEF)
+        } else Color.Transparent,
+        animationSpec = tween(durationMillis = 100),
+        label = "tab_bg_color"
+    )
 
-                    val tabInteractionSource = remember { MutableInteractionSource() }
-                    val isTabPressed by tabInteractionSource.collectIsPressedAsState()
-                    val tabScale by animateFloatAsState(
-                        targetValue = if (isTabPressed) 0.94f else 1f,
-                        animationSpec = PremiumPressSpringSpec,
-                        label = "tab_press_scale"
-                    )
+    val animatedBorderColor by animateColorAsState(
+        targetValue = if (isSelected) {
+            if (colors.isDark) Color(0xFF363636) else Color(0xFFDBDBDB)
+        } else Color.Transparent,
+        animationSpec = tween(durationMillis = 100),
+        label = "tab_border_color"
+    )
 
-                    val iconScale by animateFloatAsState(
-                        targetValue = if (isSelected) 1.08f else 1.0f,
-                        animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow),
-                        label = "tab_icon_scale"
-                    )
+    val animatedContentColor by animateColorAsState(
+        targetValue = if (isSelected) {
+            if (colors.isDark) Color.White else Color(0xFF111111)
+        } else colors.textMuted,
+        animationSpec = tween(durationMillis = 100),
+        label = "tab_content_color"
+    )
 
-                    Surface(
-                        shape = RoundedCornerShape(24.dp),
-                        color = animatedBgColor,
-                        border = BorderStroke(1.dp, animatedBorderColor),
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(52.dp)
-                            .scale(tabScale)
-                            .clickable(
-                                interactionSource = tabInteractionSource,
-                                indication = null
+    val tabInteractionSource = remember { MutableInteractionSource() }
+    val isTabPressed by tabInteractionSource.collectIsPressedAsState()
+    val tabScale by animateFloatAsState(
+        targetValue = if (isTabPressed) 0.94f else 1f,
+        animationSpec = PremiumPressSpringSpec,
+        label = "tab_press_scale"
+    )
+
+    val iconScale by animateFloatAsState(
+        targetValue = if (isSelected) 1.08f else 1.0f,
+        animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMedium),
+        label = "tab_icon_scale"
+    )
+
+    Surface(
+        shape = RoundedCornerShape(24.dp),
+        color = animatedBgColor,
+        border = BorderStroke(1.dp, animatedBorderColor),
+        modifier = Modifier
+            .weight(1f)
+            .height(52.dp)
+            .graphicsLayer {
+                scaleX = tabScale
+                scaleY = tabScale
+            }
+            .clickable(
+                interactionSource = tabInteractionSource,
+                indication = null
+            ) {
+                onTabSelected(tab)
+            }
+            .testTag(tab.tag)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = tab.icon,
+                    contentDescription = tab.title,
+                    tint = animatedContentColor,
+                    modifier = Modifier
+                        .size(22.dp)
+                        .graphicsLayer {
+                            scaleX = iconScale
+                            scaleY = iconScale
+                        }
+                )
+
+                // Badges
+                when (tab) {
+                    NavigationTab.CHATS -> {
+                        if (unreadChatsCount > 0) {
+                            Box(
+                                modifier = Modifier
+                                    .offset(x = 10.dp, y = (-6).dp)
+                                    .size(16.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White),
+                                contentAlignment = Alignment.Center
                             ) {
-                                onTabSelected(tab)
-                            }
-                            .testTag(tab.tag)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = tab.icon,
-                                    contentDescription = tab.title,
-                                    tint = animatedContentColor,
-                                    modifier = Modifier
-                                        .size(22.dp)
-                                        .scale(iconScale)
+                                Text(
+                                    text = if (unreadChatsCount > 9) "9+" else unreadChatsCount.toString(),
+                                    color = Color.Black,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold
                                 )
-
-                                // Badges
-                                when (tab) {
-                                    NavigationTab.CHATS -> {
-                                        if (unreadChatsCount > 0) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .offset(x = 10.dp, y = (-6).dp)
-                                                    .size(16.dp)
-                                                    .clip(CircleShape)
-                                                    .background(Color.White),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Text(
-                                                    text = if (unreadChatsCount > 9) "9+" else unreadChatsCount.toString(),
-                                                    color = Color.Black,
-                                                    fontSize = 9.sp,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                            }
-                                        }
-                                    }
-                                    NavigationTab.CALLS -> {
-                                        if (missedCallsCount > 0) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .offset(x = 10.dp, y = (-6).dp)
-                                                    .size(16.dp)
-                                                    .clip(CircleShape)
-                                                    .background(Color.White),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Text(
-                                                    text = if (missedCallsCount > 9) "9+" else missedCallsCount.toString(),
-                                                    color = Color.Black,
-                                                    fontSize = 9.sp,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                            }
-                                        }
-                                    }
-                                    NavigationTab.LEADERBOARD -> {}
-                                    NavigationTab.STORIES -> {
-                                        if (hasNewStories) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .offset(x = 9.dp, y = (-6).dp)
-                                                    .size(8.dp)
-                                                    .clip(CircleShape)
-                                                    .background(Color.White)
-                                            )
-                                        }
-                                    }
-                                    NavigationTab.PROFILE -> {}
-                                }
                             }
-
-                            Spacer(modifier = Modifier.height(2.dp))
-
-                            Text(
-                                text = tab.title,
-                                color = animatedContentColor,
-                                fontSize = if (tab == NavigationTab.LEADERBOARD) 9.sp else 10.sp,
-                                letterSpacing = if (tab == NavigationTab.LEADERBOARD) (-0.4).sp else 0.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                        }
+                    }
+                    NavigationTab.CALLS -> {
+                        if (missedCallsCount > 0) {
+                            Box(
+                                modifier = Modifier
+                                    .offset(x = 10.dp, y = (-6).dp)
+                                    .size(16.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = if (missedCallsCount > 9) "9+" else missedCallsCount.toString(),
+                                    color = Color.Black,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                    NavigationTab.LEADERBOARD -> {}
+                    NavigationTab.STORIES -> {
+                        if (hasNewStories) {
+                            Box(
+                                modifier = Modifier
+                                    .offset(x = 9.dp, y = (-6).dp)
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White)
                             )
                         }
                     }
+                    NavigationTab.PROFILE -> {}
                 }
             }
+
+            Spacer(modifier = Modifier.height(2.dp))
+
+            Text(
+                text = tab.title,
+                color = animatedContentColor,
+                fontSize = if (tab == NavigationTab.LEADERBOARD) 9.sp else 10.sp,
+                letterSpacing = if (tab == NavigationTab.LEADERBOARD) (-0.4).sp else 0.sp,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }

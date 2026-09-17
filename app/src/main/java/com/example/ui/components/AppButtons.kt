@@ -52,9 +52,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -101,7 +101,10 @@ fun AppPrimaryButton(
         onClick = { if (!isLoading && enabled) onClick() },
         enabled = enabled && !isLoading,
         modifier = modifier
-            .scale(animatedScale)
+            .graphicsLayer {
+                scaleX = animatedScale
+                scaleY = animatedScale
+            }
             .height(height)
             .defaultMinSize(minHeight = 44.dp)
             .then(if (testTag != null) Modifier.testTag(testTag) else Modifier),
@@ -195,7 +198,10 @@ fun AppSecondaryButton(
         onClick = { if (!isLoading && enabled) onClick() },
         enabled = enabled && !isLoading,
         modifier = modifier
-            .scale(animatedScale)
+            .graphicsLayer {
+                scaleX = animatedScale
+                scaleY = animatedScale
+            }
             .height(height)
             .defaultMinSize(minHeight = 44.dp)
             .then(if (testTag != null) Modifier.testTag(testTag) else Modifier),
@@ -285,7 +291,10 @@ fun AppDestructiveButton(
             onClick = { if (!isLoading && enabled) onClick() },
             enabled = enabled && !isLoading,
             modifier = modifier
-                .scale(animatedScale)
+                .graphicsLayer {
+                    scaleX = animatedScale
+                    scaleY = animatedScale
+                }
                 .height(height)
                 .defaultMinSize(minHeight = 48.dp)
                 .then(if (testTag != null) Modifier.testTag(testTag) else Modifier),
@@ -315,7 +324,10 @@ fun AppDestructiveButton(
             onClick = { if (!isLoading && enabled) onClick() },
             enabled = enabled && !isLoading,
             modifier = modifier
-                .scale(animatedScale)
+                .graphicsLayer {
+                    scaleX = animatedScale
+                    scaleY = animatedScale
+                }
                 .height(height)
                 .defaultMinSize(minHeight = 48.dp)
                 .then(if (testTag != null) Modifier.testTag(testTag) else Modifier),
@@ -373,7 +385,10 @@ fun AppIconButton(
     Box(
         modifier = modifier
             .size(size)
-            .scale(animatedScale)
+            .graphicsLayer {
+                scaleX = animatedScale
+                scaleY = animatedScale
+            }
             .clip(shape)
             .background(if (enabled) effectiveBg else effectiveBg.copy(alpha = 0.4f))
             .border(
@@ -425,7 +440,10 @@ fun AppSendButton(
     Box(
         modifier = modifier
             .size(size)
-            .scale(scale)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
             .clip(CircleShape)
             .background(bgColor)
             .border(1.dp, if (isSendEnabled) colors.accentOrange else colors.borderSubtle, CircleShape)
@@ -468,7 +486,10 @@ fun AppAttachmentGridItem(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
-            .scale(scale)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
             .clip(RoundedCornerShape(14.dp))
             .clickable(
                 interactionSource = interactionSource,
@@ -544,7 +565,10 @@ fun AppFilterChip(
         color = containerColor,
         border = BorderStroke(1.dp, borderColor),
         modifier = modifier
-            .scale(scale)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
             .height(34.dp)
     ) {
         Row(
@@ -603,7 +627,10 @@ fun AppGhostButton(
         onClick = onClick,
         interactionSource = interactionSource,
         modifier = modifier
-            .scale(scale)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
             .defaultMinSize(minHeight = 44.dp),
         colors = ButtonDefaults.textButtonColors(contentColor = contentColor),
         shape = AppButtonSmallShape
@@ -711,7 +738,10 @@ fun InstagramSwitch(
 
     Box(
         modifier = modifier
-            .scale(scale)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
             .then(if (testTag != null) Modifier.testTag(testTag) else Modifier)
             .width(48.dp)
             .height(28.dp)

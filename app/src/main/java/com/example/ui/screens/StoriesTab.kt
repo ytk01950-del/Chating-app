@@ -49,6 +49,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -77,7 +78,9 @@ fun StoriesTab(
     val colors = AppTheme.colors
     val context = LocalContext.current
     val hasMyStories = myStories.isNotEmpty()
-    val otherStoriesWithActive = groupedStories.filter { it.stories.isNotEmpty() }
+    val otherStoriesWithActive = remember(groupedStories) {
+        groupedStories.filter { it.stories.isNotEmpty() }
+    }
 
     Box(
         modifier = modifier
@@ -87,6 +90,7 @@ fun StoriesTab(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
+                .graphicsLayer { }
                 .testTag("stories_tab_list"),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 90.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -349,13 +353,18 @@ fun StoriesTab(
                     }
                 }
             } else {
-                items(otherStoriesWithActive, key = { it.user.id }) { group ->
+                items(
+                    items = otherStoriesWithActive,
+                    key = { it.user.id },
+                    contentType = { "story_group_item" }
+                ) { group ->
                     val latestStory = group.stories.maxByOrNull { it.createdAt }
                     val formattedTime = latestStory?.let { DateTimeUtils.formatStoryTimestamp(it.createdAt) } ?: "Recent"
 
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .graphicsLayer { }
                             .clip(RoundedCornerShape(16.dp))
                             .clickable { onViewUserStories(group.user, group.stories) }
                             .testTag("story_user_item_${group.user.id}"),

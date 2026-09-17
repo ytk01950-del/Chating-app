@@ -50,7 +50,7 @@ fun UserAvatar(
     statusBorderColor: Color = DarkSurface,
     modifier: Modifier = Modifier
 ) {
-    val colorIndex = (avatarId.coerceAtLeast(0)) % AvatarColorPairs.size
+    val colorIndex = remember(avatarId) { (avatarId.coerceAtLeast(0)) % AvatarColorPairs.size }
     val (bgColor, textColor) = AvatarColorPairs[colorIndex]
     val initials = remember(name) {
         if (name.isNotBlank()) {
@@ -72,7 +72,9 @@ fun UserAvatar(
                 .data(photoUrl)
                 .size(sizePx, sizePx)
                 .precision(Precision.INEXACT)
-                .crossfade(150)
+                .crossfade(false)
+                .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
+                .diskCachePolicy(coil.request.CachePolicy.ENABLED)
                 .build()
         } else null
     }

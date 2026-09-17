@@ -312,7 +312,7 @@ class ChatViewModel(
             result.onSuccess { user ->
                 _currentUser.value = user
                 _authUiState.value = AuthUiState.Authenticated(user)
-                _infoMessage.value = "Welcome to WP CHAT, @${user.username}!"
+                _infoMessage.value = "Welcome to Nexachat, @${user.username}!"
                 startObservingUsers(user.id)
             }.onFailure { err ->
                 _authUiState.value = AuthUiState.Error(err.localizedMessage ?: "Sign up failed")

@@ -12,7 +12,7 @@ data class User(
     val photoUrl: String = "",
     val bio: String = "",
     val gender: String = "Male", // "Male" or "Female"
-    val statusMessage: String = "Hey there! I am using WP CHAT.",
+    val statusMessage: String = "Hey there! I am using Nexachat.",
     val isOnline: Boolean = false,
     val lastSeen: Long = System.currentTimeMillis(),
     val createdAt: Long = System.currentTimeMillis(),

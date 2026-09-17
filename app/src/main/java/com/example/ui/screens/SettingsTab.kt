@@ -239,7 +239,7 @@ fun SettingsTab(
                             Spacer(modifier = Modifier.height(4.dp))
 
                             Text(
-                                text = currentUser.statusMessage.ifBlank { "Hey there! I am using WP CHAT." },
+                                text = currentUser.statusMessage.ifBlank { "Hey there! I am using Nexachat." },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = colors.textSecondary,
                                 maxLines = 1,
@@ -837,7 +837,7 @@ fun SettingsTab(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Sign Out of WP CHAT",
+                        text = "Sign Out of Nexachat",
                         color = Color(0xFFEF4444),
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp
@@ -861,7 +861,7 @@ fun SettingsTab(
             },
             text = {
                 Text(
-                    text = "Are you sure you want to sign out of your WP CHAT account on this device?",
+                    text = "Are you sure you want to sign out of your Nexachat account on this device?",
                     color = colors.textSecondary,
                     fontSize = 14.sp
                 )
